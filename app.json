@@ -1,0 +1,15 @@
+{
+  "name": "Slack Avalon Bot",
+  "description": "A bot that hosts Avalon games on Slack",
+  "keywords": [
+    "slack",
+    "avalon",
+    "bot"
+  ],
+  "repository": "https://github.com/docsend/slack-avalon-bot",
+  "env": {
+    "SLACK_AVALON_BOT_TOKEN": {
+      "description": "Your Slack bot integration token (obtainable at https://my.slack.com/services/new/bot)"
+    }
+  }
+}
