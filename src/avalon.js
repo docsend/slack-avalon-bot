@@ -249,7 +249,7 @@ class Avalon {
         let questAssign = this.questAssign();
         let f = '';
         if (questAssign.f > 1) {
-          f = ' (2 fails required)';
+          f = '(2 fails required) ';
         }
         let message = ` ${questAssign.n} players ${f}to go on the ${ORDER[this.questNumber]} quest.`;
         let status = `Quest progress: ${this.getStatus(true)}\n`;
