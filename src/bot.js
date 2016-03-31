@@ -358,7 +358,7 @@ class Bot {
       return rx.Observable.return(null);
     }
 
-    channel.send(`We've got ${players.length} players, let's start the game.`);
+    channel.send(`${players.length} players (${M.pp(players)}) started a game. Say \`spectate\` to watch.`);
     this.isGameRunning = true;
     
     let game = new Avalon(this.slack, messages, players);
@@ -373,12 +373,31 @@ class Bot {
         channel.send(`${M.formatAtUser(player)} has decided to quit the game.`);
         game.endGame(`${M.formatAtUser(player)} has decided to quit the game.`);
       });
+
+    let spectateGame = messages
+      .where(e => e.channel == channel.id)
+      .where(e => e.text && e.text.match(/spectate/i))
+      .where(e => {
+        if (players.some(player => player.id == e.user)) {
+          channel.send('You are already in the game');
+          return false;
+        }
+        if (game.spectators.some(spectator => spectator.id == e.user)) {
+          channel.send('You are already spectating the game');
+          return false;
+        }
+        return true;
+      })
+      .take(1)
+      .flatMap(e => SlackApiRx.openDm(this.slack, this.slack.getUserByID(e.user)))
+      .subscribe(spectator => game.addSpectator(spectator));
     
     return SlackApiRx.openDms(this.slack, players)
       .flatMap(playerDms => rx.Observable.timer(2000)
         .flatMap(() => game.start(playerDms)))
       .do(() => {
         quitGameDisp.dispose();
+        spectateGame.dispose();
         this.isGameRunning = false;
       });
   }

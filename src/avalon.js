@@ -78,6 +78,7 @@ class Avalon {
     this.slack = slack;
     this.messages = messages;
     this.players = players;
+    this.spectators = [];
     this.scheduler = scheduler;
     this.gameEnded = new rx.Subject();
     _.extend(this, Avalon.DEFAULT_CONFIG);
@@ -94,6 +95,7 @@ class Avalon {
 
     let players = this.players = this.playerOrder(this.players);
     let assigns = this.getRoleAssigns(Avalon.getAssigns(players.length, this.specialRoles, this.resistance));
+    this.leader = players[0];
 
     let evils = this.evils = [];
     for (let i=0; i < players.length; i++) {
@@ -173,24 +175,36 @@ class Avalon {
       .concatMap(player => this.deferredActionForPlayer(player));
   }
 
+  addSpectator(spectator) {
+    if (!this.isRunning) {
+      return;
+    }
+    if (!this.spectators.some(s => s.id == spectator.id)) {
+      let message = `Current quest progress: ${this.getStatus(true)}`;
+      let order = this.players.map(p => p.id == this.leader.id ? `*${M.formatAtUser(p)}*` : M.formatAtUser(p))
+      this.dm(spectator, `${message}\nPlayer order: ${order}`, null, 'start');
+      this.spectators.push(spectator);
+    }
+  }
+
   revealRoles(excludeMerlin) {
     excludeMerlin = excludeMerlin || false;
     let lines = [`${M.pp(this.evils)} are :red_circle: Minions of Mordred.`];
     let reveals = {};
     for (let player of this.players) {
       if (player.role == 'merlin' && !excludeMerlin) {
-        reveals['merlin'] = `${M.formatAtUser(player)} is :angel: MERLIN`;
+        reveals['merlin'] = `${M.formatAtUser(player)} is :angel: MERLIN.`;
       } else if (player.role == 'percival') {
-        reveals['percival'] = `${M.formatAtUser(player)} is :cop: PERCIVAL`;
+        reveals['percival'] = `${M.formatAtUser(player)} is :cop: PERCIVAL.`;
       } else if (player.role == 'morgana') {
-        reveals['morgana'] = `${M.formatAtUser(player)} is :japanese_ogre: MORGANA`;
+        reveals['morgana'] = `${M.formatAtUser(player)} is :japanese_ogre: MORGANA.`;
       } else if (player.role == 'mordred') {
-        reveals['mordred'] = `${M.formatAtUser(player)} is :smiling_imp: MORDRED`;
+        reveals['mordred'] = `${M.formatAtUser(player)} is :smiling_imp: MORDRED.`;
       } else if (player.role == 'oberon') {
-        reveals['oberon'] = `${M.formatAtUser(player)} is :alien: OBERON`;
+        reveals['oberon'] = `${M.formatAtUser(player)} is :alien: OBERON.`;
       }
     }
-    return lines.concat(Object.keys(ROLES).filter(role => !!reveals[role]).map(role => reveals[role])).join('\n');
+    return lines.concat(Object.keys(ROLES).filter(role => !!reveals[role]).map(role => reveals[role]).join(' ')).join('\n');
   }
 
   endGame(message, color, current) {
@@ -202,6 +216,9 @@ class Avalon {
   }
 
   dm(player, message, color, special) {
+    if (player instanceof Array) {
+      return player.forEach(p => this.dm(p, message, color, special));
+    }
     let attachment = { fallback: message, text: message, mrkdwn: true, mrkdwn_in: ['pretext','text'] };
     if (color) attachment.color = color;
     if (special == 'start') {
@@ -256,13 +273,10 @@ class Avalon {
         let order = this.players.map(p => p.id == player.id ? `*${M.formatAtUser(p)}*` : M.formatAtUser(p))
         status += `Player order: ${order}\n`;
         let special = this.questNumber == 0 && this.rejectCount == 0 ? 'start' : '';
-        for (let p of this.players) {
-          if (p.id == player.id) {
-            this.dm(p,`${status}*You* choose${message}\n(.eg \`send name1, name2\`)`, '#a60', special);
-          } else {
-            this.dm(p,`${status}${M.formatAtUser(player)} chooses${message}`, null, special);
-          }
-        }
+
+        this.dm(player,`${status}*You* choose${message}\n(.eg \`send name1, name2\`)`, '#a60', special);
+        this.dmOtherPlayers(player,`${status}${M.formatAtUser(player)} chooses${message}`, null, special);
+
         return this.choosePlayersForQuest(player)
           .concatMap(votes => {
             let printQuesters = M.pp(this.questPlayers);
@@ -285,14 +299,23 @@ class Avalon {
   }
 
   broadcast(message, color, special) {
-    for (let player of this.players) {
-      this.dm(player, message, color, special);
+    this.dm(this.players, message, color, special);
+    this.dm(this.spectators, message, color, special);
+  }
+
+  dmOtherPlayers(excludePlayer, message, color, special) {
+    let players;
+    if (excludePlayer instanceof Array) {
+      players = _.differenceBy(this.players, excludePlayer, (player) => player.id);
+    } else {
+      players = this.players.filter(player => player.id != excludePlayer.id);
     }
+    this.dm(players, message, color, special);
+    this.dm(this.spectators, message, color, special);
   }
 
   choosePlayersForQuest(player) {
     let questAssign = this.questAssign();
-    let voters = 0;
     return this.messages
       .where(e => e.user === player.id)
       .map(e => e.text)
@@ -319,24 +342,15 @@ class Avalon {
       .concatMap(questPlayers => {
         this.questPlayers = questPlayers;
         this.dm(player, `You've chosen ${M.pp(questPlayers)} to go on the ${ORDER[this.questNumber]} quest.\nVote *approve* or *reject*`, '#555');
+        this.dmOtherPlayers(player, `${M.formatAtUser(player)} is sending ${M.pp(questPlayers)} to the ${ORDER[this.questNumber]} quest.\nVote *approve* or *reject*`, '#555');
         return rx.Observable.fromArray(this.players)
-          .map(p => {
-            if (p.id != player.id) {
-              this.dm(p, `${M.formatAtUser(player)} is sending ${M.pp(questPlayers)} to the ${ORDER[this.questNumber]} quest.\nVote *approve* or *reject*`, '#555');
-            }
-            return this.dmMessages(p)
-              .where(e => e.user === p.id)
-              .map(e => e.text)
-              .where(text => text && text.match(/^\b(approve|reject)\b$/i))
-              .map(text => { return { player: p, approve: text.match(/approve/i) }})
-              .take(1)
-          }).mergeAll()
-          
-      })
-      .do(() => {
-        if (++voters < this.players.length) {
-          this.broadcast(`${voters} out of ${this.players.length} voted for the ${ORDER[this.questNumber]} quest`);
-        }
+          .map(p => this.dmMessages(p)
+            .where(e => e.user === p.id)
+            .map(e => e.text)
+            .where(text => text && text.match(/^\b(approve|reject)\b$/i))
+            .map(text => { return { player: p, approve: text.match(/approve/i) }})
+            .take(1))
+          .mergeAll()
       })
       .take(this.players.length)
       .reduce((acc, vote) => {
@@ -344,6 +358,13 @@ class Avalon {
           acc.approved.push(vote.player);
         } else {
           acc.rejected.push(vote.player);
+        }
+        if (acc.approved.length + acc.rejected.length < this.players.length) {
+          let voted = acc.approved.map(vote => vote.player).concat(acc.rejected.map(vote => vote.player));
+          let message = `${voted.length} out of ${this.players.length} voted for the ${ORDER[this.questNumber]} quest.`;
+          this.dm(voted, `${message} Your vote is in!`);
+          _.differenceBy(this.players, voted).forEach(player => this.dm(player, `${message} Awaiting your vote...`));
+          this.dm(this.spectators, message);
         }
         return acc;
       }, { approved: [], rejected: [] })
@@ -374,32 +395,37 @@ class Avalon {
     message += `\nCurrent quest progress: ${this.getStatus(true)}`;
     let order = this.players.map(p => p.id == leader.id ? `*${M.formatAtUser(p)}*` : M.formatAtUser(p))
     message += `\nPlayer order: ${order}`;
-    for (let player of this.players) {
-      if (questPlayers.some(p => p.name == player.name)) {
-        this.dm(player, `${message}\nYou can *succeed* or *fail* for this mission`, '#ea0')
-      } else {
-        this.dm(player, `${message}\nWait for the quest results.`);
-      }
-    }
+    this.leader = leader;
+    this.dm(questPlayers, `${message}\nYou can *succeed* or *fail* for this mission`, '#ea0');
+    this.dmOtherPlayers(questPlayers, `${message}\nWait for the quest results.`);
+
     let runners = 0;
     return rx.Observable.fromArray(questPlayers)
-      .map(player => {
-        return this.dmMessages(player)
-          .where(e => e.user === player.id)
-          .map(e => e.text)
-          .where(text => text && text.match(/^\b(succeed|fail)\b$/i))
-          .map(text => text.match(/fail/i) ? 1 : 0)
-          .take(1)
-      }).mergeAll()
-      .do(() => {
-        if (++runners < questPlayers.length) {
-          this.broadcast(`${runners} out of ${questPlayers.length} completed the ${ORDER[this.questNumber]} quest`);
-        }
-      })
+      .map(player => this.dmMessages(player)
+        .where(e => e.user === player.id)
+        .map(e => e.text)
+        .where(text => text && text.match(/^\b(succeed|fail)\b$/i))
+        .map(text => { return { player: player, fail: text.match(/fail/i) }})
+        .take(1))
+      .mergeAll()
       .take(questPlayers.length)
-      .reduce((acc, fail) => acc + fail,0)
-      .map((fails) => {
-        if (fails > 0) {
+      .reduce((acc, questResult) => {
+        if (questResult.fail) {
+          acc.failed.push(questResult.player);
+        } else {
+          acc.succeeded.push(questResult.player);
+        }
+        if (acc.failed.length + acc.succeeded.length < questPlayers.length) {
+          let completed = acc.failed.map(res => res.player).concat(acc.succeeded.map(res => res.player));
+          let message = `${completed.length} out of ${questPlayers.length} players have completed the ${ORDER[this.questNumber]} quest.`;
+          this.dm(completed, `${completed.length} out of ${questPlayers.length} players (including you) have completed the ${ORDER[this.questNumber]} quest.`);
+          _.differenceBy(this.players, completed).forEach(player => this.dm(player, `${message} Awaiting your quest completion...`));
+          this.dm(this.spectators, message);
+        }
+        return acc;
+      }, { succeeded: [], failed: [] })
+      .map(questResults => {
+        if (questResults.failed.length > 0) {
           this.progress.push('bad');
           this.broadcast(`${fails} in (${M.pp(questPlayers)}) failed the ${ORDER[this.questNumber]} quest!`, '#e00');
         } else {
@@ -428,13 +454,9 @@ class Avalon {
           this.broadcast(`Victory is near for :large_blue_circle: Loyal Servents of Arthur for succeeding 3 quests!`);
           return rx.Observable.defer(() => {
             return rx.Observable.timer(1000, this.scheduler).flatMap(() => {
-              for (let player of this.players) {
-                if (player.id == assassin.id) {
-                  this.dm(player, `*You* are the :red_circle::crossed_swords:ASSASSIN. Type \`kill <player>\` to attempt to kill MERLIN`, '#e00');
-                } else {
-                  this.dm(player, `*${M.formatAtUser(assassin)}* is the :red_circle::crossed_swords:ASSASSIN. Awaiting the MERLIN assassination attempt...`);
-                }
-              }
+              this.dm(assassin, `*You* are the :red_circle::crossed_swords:ASSASSIN. Type \`kill <player>\` to attempt to kill MERLIN`, '#e00');
+              this.dmOtherPlayers(assassin, `*${M.formatAtUser(assassin)}* is the :red_circle::crossed_swords:ASSASSIN. Awaiting the MERLIN assassination attempt...`);
+
               return rx.Observable.return(true).flatMap(() => {
                 return this.messages
                   .where(e => e.user == assassin.id)
@@ -454,21 +476,11 @@ class Avalon {
                   .do(accused => {
                     let status = `Quest Results: ${this.getStatus()}\n`;
                     if (accused.role != 'merlin') {
-                      for (let player of this.players) {
-                        if (player.id == assassin.id) {
-                          this.dm(player, `${status}${M.formatAtUser(accused)} is not MERLIN. :angel:${M.formatAtUser(merlin)} is.\n:large_blue_circle: Loyal Servants of Arthur win!\n${this.revealRoles(true)}`, '#08e', 'end');
-                        } else {
-                          this.dm(player, `${status}:crossed_swords:${M.formatAtUser(assassin)} chose ${M.formatAtUser(accused)} as MERLIN, not :angel:${M.formatAtUser(merlin)}.\n:large_blue_circle: Loyal Servants of Arthur win!\n${this.revealRoles(true)}`, '#08e', 'end');
-                        }
-                      }
+                      this.dm(assassin, `${status}${M.formatAtUser(accused)} is not MERLIN. :angel:${M.formatAtUser(merlin)} is.\n:large_blue_circle: Loyal Servants of Arthur win!\n${this.revealRoles(true)}`, '#08e', 'end');
+                      this.dmOtherPlayers(assassin, `${status}:crossed_swords:${M.formatAtUser(assassin)} chose ${M.formatAtUser(accused)} as MERLIN, not :angel:${M.formatAtUser(merlin)}.\n:large_blue_circle: Loyal Servants of Arthur win!\n${this.revealRoles(true)}`, '#08e', 'end');
                     } else {
-                      for (let player of this.players) {
-                        if (player.id == assassin.id) {
-                          this.dm(player, `${status}You chose :angel:${M.formatAtUser(accused)} correctly as MERLIN.\n:red_circle: Minions of Mordred win!\n${this.revealRoles(true)}`, '#e00', 'end');
-                        } else {
-                          this.dm(player, `${status}:crossed_swords:${M.formatAtUser(assassin)} chose :angel:${M.formatAtUser(accused)} correctly as MERLIN.\n:red_circle: Minions of Mordred win!\n${this.revealRoles(true)}`, '#e00', 'end');
-                        }
-                      }
+                      this.dm(assassin, `${status}You chose :angel:${M.formatAtUser(accused)} correctly as MERLIN.\n:red_circle: Minions of Mordred win!\n${this.revealRoles(true)}`, '#e00', 'end');
+                      this.dmOtherPlayers(assassin, `${status}:crossed_swords:${M.formatAtUser(assassin)} chose :angel:${M.formatAtUser(accused)} correctly as MERLIN.\n:red_circle: Minions of Mordred win!\n${this.revealRoles(true)}`, '#e00', 'end');
                     }
                     this.quit();
                   });
