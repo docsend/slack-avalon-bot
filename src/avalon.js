@@ -175,11 +175,12 @@ class Avalon {
       .concatMap(player => this.deferredActionForPlayer(player));
   }
 
-  addSpectator(spectator) {
+  addSpectator(spectator, playerDm) {
     if (!this.isRunning) {
       return;
     }
     if (!this.spectators.some(s => s.id == spectator.id)) {
+      this.playerDms[spectator.id] = playerDm;
       let message = `Current quest progress: ${this.getStatus(true)}`;
       let order = this.players.map(p => p.id == this.leader.id ? `*${M.formatAtUser(p)}*` : M.formatAtUser(p))
       this.dm(spectator, `${message}\nPlayer order: ${order}`, null, 'start');

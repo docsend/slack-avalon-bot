@@ -374,6 +374,7 @@ class Bot {
         game.endGame(`${M.formatAtUser(player)} has decided to quit the game.`);
       });
 
+    let spectator;
     let spectateGame = messages
       .where(e => e.channel == channel.id)
       .where(e => e.text && e.text.match(/spectate/i))
@@ -389,8 +390,8 @@ class Bot {
         return true;
       })
       .take(1)
-      .flatMap(e => SlackApiRx.openDm(this.slack, this.slack.getUserByID(e.user)))
-      .subscribe(spectator => game.addSpectator(spectator));
+      .flatMap(e => SlackApiRx.openDms(this.slack, [spectator = this.slack.getUserByID(e.user)]))
+      .subscribe(playerDms => game.addSpectator(spectator, playerDms[spectator.id]));
     
     return SlackApiRx.openDms(this.slack, players)
       .flatMap(playerDms => rx.Observable.timer(2000)
