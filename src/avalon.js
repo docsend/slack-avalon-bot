@@ -180,6 +180,7 @@ class Avalon {
       return;
     }
     if (!this.spectators.some(s => s.id == spectator.id)) {
+      spectator.spectator = true;
       this.playerDms[spectator.id] = playerDm;
       let message = `Current quest progress: ${this.getStatus(true)}`;
       let order = this.players.map(p => p.id == this.leader.id ? `*${M.formatAtUser(p)}*` : M.formatAtUser(p))
@@ -223,7 +224,7 @@ class Avalon {
     let attachment = { fallback: message, text: message, mrkdwn: true, mrkdwn_in: ['pretext','text'] };
     if (color) attachment.color = color;
     if (special == 'start') {
-      attachment.pretext = `*Start Avalon Game* (${this.date})`;
+      attachment.pretext = `*${player.spectator ? 'Spectating' : 'Start'} Avalon Game* (${this.date})`;
       let prependText = `${this.evils.length} out of ${this.players.length} players are evil.`;
       let specialRoles = this.players.filter(p => p.role != 'good' && p.role != 'bad' || p.role != 'assassin');
       if (specialRoles.length) {
@@ -343,7 +344,9 @@ class Avalon {
       .concatMap(questPlayers => {
         this.questPlayers = questPlayers;
         this.dm(player, `You've chosen ${M.pp(questPlayers)} to go on the ${ORDER[this.questNumber]} quest.\nVote *approve* or *reject*`, '#555');
-        this.dmOtherPlayers(player, `${M.formatAtUser(player)} is sending ${M.pp(questPlayers)} to the ${ORDER[this.questNumber]} quest.\nVote *approve* or *reject*`, '#555');
+        let message = `${M.formatAtUser(player)} is sending ${M.pp(questPlayers)} to the ${ORDER[this.questNumber]} quest.`;
+        this.dm(this.players.filter(p => p.id != player.id), `${message}\nVote *approve* or *reject*`, '#555');
+        this.dm(this.spectators, `${message}\nAwaiting votes...`);
         return rx.Observable.fromArray(this.players)
           .map(p => this.dmMessages(p)
             .where(e => e.user === p.id)
