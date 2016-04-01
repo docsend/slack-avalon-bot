@@ -276,21 +276,21 @@ class Avalon {
         status += `Player order: ${order}\n`;
         let special = this.questNumber == 0 && this.rejectCount == 0 ? 'start' : '';
 
-        this.dm(player,`${status}*You* choose${message}\n(.eg \`send name1, name2\`)`, '#a60', special);
+        this.dm(player,`${status}*You* choose${message} (.eg \`send name1, name2\`)`, '#a60', special);
         this.dmOtherPlayers(player,`${status}${M.formatAtUser(player)} chooses${message}`, null, special);
 
         return this.choosePlayersForQuest(player)
           .concatMap(votes => {
             let printQuesters = M.pp(this.questPlayers);
             if (votes.approved.length > votes.rejected.length) {
-              this.broadcast(`The ${ORDER[this.questNumber]} quest with ${printQuesters} going was approved by ${M.pp(votes.approved)} (${M.pp(votes.rejected)} rejected)`)
+              this.broadcast(`The ${ORDER[this.questNumber]} quest with ${printQuesters} going was approved by ${M.pp(votes.approved)} (${votes.rejected.length ? M.pp(votes.rejected) : 'no one'} rejected)`)
               this.rejectCount = 0;
               return rx.Observable.defer(() => rx.Observable.timer(timeToPause, this.scheduler).flatMap(() => {
                 return this.runQuest(this.questPlayers, player);
               }));
             }
             this.rejectCount++;
-            this.broadcast(`The ${ORDER[this.questNumber]} quest with ${printQuesters} going was rejected (${this.rejectCount}) by ${M.pp(votes.rejected)} (${M.pp(votes.approved)} approved)`)
+            this.broadcast(`The ${ORDER[this.questNumber]} quest with ${printQuesters} going was rejected (${this.rejectCount}) by ${M.pp(votes.rejected)} (${votes.approved.length ? M.pp(votes.approved) : 'no one'} approved)`)
             if (this.rejectCount >= 5) {
               this.endGame(`:red_circle: Minions of Mordred win due to the ${ORDER[this.questNumber]} quest rejected 5 times!`, '#e00', true);
             }
@@ -364,7 +364,7 @@ class Avalon {
           acc.rejected.push(vote.player);
         }
         if (acc.approved.length + acc.rejected.length < this.players.length) {
-          let voted = acc.approved.map(vote => vote.player).concat(acc.rejected.map(vote => vote.player));
+          let voted = acc.approved.concat(acc.rejected);
           let message = `${voted.length} out of ${this.players.length} voted for the ${ORDER[this.questNumber]} quest.`;
           this.dm(voted, `${message} Your vote is in!`);
           _.differenceBy(this.players, voted).forEach(player => this.dm(player, `${message} Awaiting your vote...`));
@@ -385,8 +385,8 @@ class Avalon {
       let questAssign = QUEST_ASSIGNS[this.players.length - Avalon.MIN_PLAYERS][this.questNumber];
       status.push(`${questAssign.n}${questAssign.f > 1 ? '*' : ''}:black_circle:`);
     }
-    if (status.length < Avalon.MIN_PLAYERS) {
-      status = status.concat(_.times(Avalon.MIN_PLAYERS - status.length, (i) => {
+    if (status.length < ORDER.length) {
+      status = status.concat(_.times(ORDER.length - status.length, (i) => {
         let questAssign = QUEST_ASSIGNS[this.players.length - Avalon.MIN_PLAYERS][i + status.length];
         return `${questAssign.n}${questAssign.f > 1 ? '*' : ''}:white_circle:`;
       }));
@@ -420,7 +420,7 @@ class Avalon {
           acc.succeeded.push(questResult.player);
         }
         if (acc.failed.length + acc.succeeded.length < questPlayers.length) {
-          let completed = acc.failed.map(res => res.player).concat(acc.succeeded.map(res => res.player));
+          let completed = acc.failed.concat(acc.succeeded);
           let message = `${completed.length} out of ${questPlayers.length} players have completed the ${ORDER[this.questNumber]} quest.`;
           this.dm(completed, `${completed.length} out of ${questPlayers.length} players (including you) have completed the ${ORDER[this.questNumber]} quest.`);
           _.differenceBy(this.players, completed).forEach(player => this.dm(player, `${message} Awaiting your quest completion...`));
