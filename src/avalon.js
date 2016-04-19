@@ -431,7 +431,7 @@ class Avalon {
       .map(questResults => {
         if (questResults.failed.length > 0) {
           this.progress.push('bad');
-          this.broadcast(`${fails} in (${M.pp(questPlayers)}) failed the ${ORDER[this.questNumber]} quest!`, '#e00');
+          this.broadcast(`${questResults.failed.length} in (${M.pp(questPlayers)}) failed the ${ORDER[this.questNumber]} quest!`, '#e00');
         } else {
           this.progress.push('good')
           this.broadcast(`${M.pp(questPlayers)} succeeded the ${ORDER[this.questNumber]} quest!`, '#08e');
