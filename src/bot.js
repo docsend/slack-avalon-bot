@@ -394,7 +394,7 @@ class Bot {
       .subscribe(playerDms => game.addSpectator(spectator, playerDms[spectator.id]));
     
     return SlackApiRx.openDms(this.slack, players)
-      .flatMap(playerDms => rx.Observable.timer(5000)
+      .flatMap(playerDms => rx.Observable.timer(2000)
         .flatMap(() => game.start(playerDms)))
       .do(() => {
         quitGameDisp.dispose();

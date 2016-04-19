@@ -75,10 +75,10 @@ module.exports = class SlackApiRx {
   //
   // Returns a replayable {Observable} containing the opened DM channel
   static waitForDmToOpen(slackApi, user) {
-    let ret = rx.DOM.fromEvent(slackApi, 'raw_message')
+    let ret = rx.Observable.fromEvent(slackApi, 'raw_message')
       .where((m) => m.type === 'im_open' && m.user === user.id)
       .take(1)
-      .flatMap(() => rx.Observable.timer(1000).map(() =>
+      .flatMap(() => rx.Observable.timer(100).map(() =>
         slackApi.getDMByName(user.name)))
       .publishLast();
       
