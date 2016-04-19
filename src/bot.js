@@ -35,10 +35,12 @@ class Bot {
     let messages = rx.Observable.fromEvent(this.slack, 'message')
       .where(e => e.type === 'message');
 
-    rx.Observable.fromEvent(this.slack, 'message').where(e => e.subtype === 'channel_join').subscribe(e => {
-      let channel = this.slack.getChannelGroupOrDMByID(e.channel);
-      channel.send(this.welcomeMessage());
-    });
+    if (!process.env.DISABLE_WELCOME_MESSAGE) {
+      rx.Observable.fromEvent(this.slack, 'message').where(e => e.subtype === 'channel_join').subscribe(e => {
+        let channel = this.slack.getChannelGroupOrDMByID(e.channel);
+        channel.send(this.welcomeMessage());
+      });
+    }
 
     let atMentions = messages.where(e => e.text && e.text.toLowerCase().match(this.slack.self.name));
 
