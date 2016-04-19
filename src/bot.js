@@ -260,7 +260,7 @@ class Bot {
   // Returns an {Observable} that signals completion of the game 
   pollPlayersForGame(messages, channel, initiator, specialChars, scheduler, timeout) {
     scheduler = scheduler || rx.Scheduler.timeout;
-    timeout = timeout || 30;
+    timeout = timeout || 60;
     this.isPolling = true;
 
     if (this.gameConfig.resistance) {
@@ -394,7 +394,7 @@ class Bot {
       .subscribe(playerDms => game.addSpectator(spectator, playerDms[spectator.id]));
     
     return SlackApiRx.openDms(this.slack, players)
-      .flatMap(playerDms => rx.Observable.timer(2000)
+      .flatMap(playerDms => rx.Observable.timer(5000)
         .flatMap(() => game.start(playerDms)))
       .do(() => {
         quitGameDisp.dispose();

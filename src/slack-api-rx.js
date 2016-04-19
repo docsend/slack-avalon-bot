@@ -41,7 +41,7 @@ module.exports = class SlackApiRx {
       return rx.Observable.return({id: user.id, dm: dm});
     }
     
-    console.log(`No open channel found, opening one using ${user.id}`);
+    console.log(`No open channel found for ${user.name}, opening one using ${user.id}`);
     
     return SlackApiRx.openDm(slackApi, user)
       .flatMap(() => SlackApiRx.waitForDmToOpen(slackApi, user))
@@ -78,7 +78,7 @@ module.exports = class SlackApiRx {
     let ret = rx.DOM.fromEvent(slackApi, 'raw_message')
       .where((m) => m.type === 'im_open' && m.user === user.id)
       .take(1)
-      .flatMap(() => rx.Observable.timer(100).map(() => 
+      .flatMap(() => rx.Observable.timer(1000).map(() =>
         slackApi.getDMByName(user.name)))
       .publishLast();
       
