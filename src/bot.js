@@ -35,12 +35,10 @@ class Bot {
     let messages = rx.Observable.fromEvent(this.slack, 'message')
       .where(e => e.type === 'message');
 
-    if (!process.env.DISABLE_WELCOME_MESSAGE) {
-      rx.Observable.fromEvent(this.slack, 'message').where(e => e.subtype === 'channel_join').subscribe(e => {
-        let channel = this.slack.getChannelGroupOrDMByID(e.channel);
-        channel.send(this.welcomeMessage());
-      });
-    }
+    rx.Observable.fromEvent(this.slack, 'message').where(e => e.subtype === 'channel_join').subscribe(e => {
+      let channel = this.slack.getChannelGroupOrDMByID(e.channel);
+      channel.send(this.welcomeMessage());
+    });
 
     let atMentions = messages.where(e => e.text && e.text.toLowerCase().match(this.slack.self.name));
 
@@ -420,10 +418,6 @@ class Bot {
     this.channels = _.keys(this.slack.channels)
       .map(k => this.slack.channels[k])
       .filter(c => c.is_member);
-
-    this.channels.forEach(channel => {
-      channel.send(this.welcomeMessage());
-    });
 
     this.groups = _.keys(this.slack.groups)
       .map(k => this.slack.groups[k])
