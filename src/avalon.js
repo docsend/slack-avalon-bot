@@ -368,7 +368,6 @@ class Avalon {
           let message = `${voted.length} out of ${this.players.length} voted for the ${ORDER[this.questNumber]} quest.`;
           this.dm(voted, `${message} Your vote is in!`);
           _.differenceBy(this.players, voted).forEach(player => this.dm(player, `${message} Awaiting your vote...`));
-          this.dm(this.spectators, message);
         }
         return acc;
       }, { approved: [], rejected: [] })
@@ -424,7 +423,6 @@ class Avalon {
           let message = `${completed.length} out of ${questPlayers.length} players have completed the ${ORDER[this.questNumber]} quest.`;
           this.dm(completed, `${completed.length} out of ${questPlayers.length} players (including you) have completed the ${ORDER[this.questNumber]} quest.`);
           _.differenceBy(this.players, completed).forEach(player => this.dm(player, `${message} Awaiting your quest completion...`));
-          this.dm(this.spectators, message);
         }
         return acc;
       }, { succeeded: [], failed: [] })
