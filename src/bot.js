@@ -389,7 +389,6 @@ class Bot {
         }
         return true;
       })
-      .take(1)
       .flatMap(e => SlackApiRx.openDms(this.slack, [spectator = this.slack.getUserByID(e.user)]))
       .subscribe(playerDms => game.addSpectator(spectator, playerDms[spectator.id]));
     
