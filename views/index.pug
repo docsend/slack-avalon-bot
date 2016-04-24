@@ -1,0 +1,86 @@
+doctype html
+html(lang='en')
+  head
+    meta(charset='utf-8')
+    meta(name='viewport', content='width=device-width, initial-scale=1')
+
+    title Avalon Setup
+    link(rel='stylesheet', href='css/bootstrap.min.css')
+    style(type='text/css').
+      .row {
+        padding-top: 20px;
+        padding-bottom: 20px;
+      }
+  body
+    .container
+      .row
+        .col-xs-6
+          if Object.keys(users).length == 0
+            | No users
+          else
+            .btn-group-vertical(data-toggle='buttons')
+              for user in users
+                label.btn.btn-default
+                  input.user(type='checkbox')
+                  = user.name
+        .col-xs-6
+          .btn-group-vertical(data-toggle='buttons')
+            label.btn.btn-primary.active
+              input.role#merlin(type='checkbox', checked)
+              | Merlin
+            label.btn.btn-default
+              input.role#percival(type='checkbox')
+              | Percival
+            label.btn.btn-default
+              input.role#morgana(type='checkbox')
+              | Morgana
+            label.btn.btn-default
+              input.role#mordred(type='checkbox')
+              | Mordred
+            label.btn.btn-default
+              input.role#oberon(type='checkbox')
+              | Oberon
+      .btn-group.btn-group-justified
+        a.btn.btn-default.disabled#start(href='#', role='button') Start Game
+    script(src='js/jquery-1.12.3.min.js')
+    script(src='js/bootstrap.min.js')
+    script.
+      var players = {};
+      $('.user').change(function() {
+        var name = $(this).parent().html().match(/>(.*)$/)[1];
+        if (this.checked) {
+          players[name] = true;
+        } else {
+          delete players[name];
+        }
+      });
+      $('.role').change(function(e) {
+        e.stopPropagation();
+        if (this.checked) {
+          switch(this.id) {
+          case 'percival':
+            $('#merlin').prop('checked', true).parent().removeClass('btn-default').addClass('btn-primary active');
+          case 'merlin':
+            $(this).parent().removeClass('btn-default').addClass('btn-primary');
+            break;
+          case 'morgana':
+            $('#percival').prop('checked', true).parent().removeClass('btn-default').addClass('btn-primary active');
+          case 'mordred':
+            $('#merlin').prop('checked', true).parent().removeClass('btn-default').addClass('btn-primary active');
+          default:
+            $(this).parent().removeClass('btn-default').addClass('btn-danger');
+            break;
+          }
+
+        } else {
+          $(this).parent().removeClass('btn-danger btn-primary active').addClass('btn-default');
+          switch(this.id) {
+          case 'merlin':
+            $('#percival').prop('checked', false).parent().removeClass('btn-primary active').addClass('btn-default');
+            $('#mordred').prop('checked', false).parent().removeClass('btn-danger active').addClass('btn-default');
+          case 'percival':
+            $('#morgana').prop('checked', false).parent().removeClass('btn-danger active').addClass('btn-default');
+            break;
+          }
+        }
+      })

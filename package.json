@@ -1,6 +1,6 @@
 {
   "name": "slack-avalon-bot",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "engines": {
     "node": "latest"
   }, 
@@ -20,6 +20,8 @@
     "rx": "^4.0.7",
     "slack-client": "^1.4.1",
     "lodash": "^4.0.1",
-    "string_score": "^v0.1"
+    "string_score": "^v0.1",
+    "express": "^4.x",
+    "pug": "2.0.0-alpha6"
   }
 }
