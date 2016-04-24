@@ -19,6 +19,7 @@
   "dependencies": {
     "rx": "^4.0.7",
     "slack-client": "^1.4.1",
-    "lodash": "^4.0.1"
+    "lodash": "^4.0.1",
+    "string_score": "^v0.1"
   }
 }

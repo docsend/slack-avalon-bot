@@ -3,6 +3,7 @@ const rx = require('rx');
 const _ = require('lodash');
 const SlackApiRx = require('./slack-api-rx');
 const M = require('./message-helpers');
+require('string_score');
 
 rx.config.longStackSupport = true;
 
@@ -93,6 +94,33 @@ class Avalon {
     this.playerDms = playerDms;
     this.date = new Date();
 
+    this.chatSubscription = this.messages
+      .where(e => playerDms[e.user] && e.channel == playerDms[e.user].id || this.spectators[e.user] && e.channel == this.spectators[e.user].id)
+      .where(e => e.text)
+      .subscribe(e => {
+        if (this.isRunning) {
+          if (e.text.match(/^quit game/i)) {
+            return;
+          }
+        } else {
+          this.chat(e.user, e.text);
+          return;
+        }
+        let player = this.players.filter(player => player.id == e.user);
+        if (player.length && player[0].action) {
+          let text = e.text.trim().toLowerCase();
+          if (player[0].action == 'voting' && text.score('approve', .5) <= .5 &&  text.score('reject', .5) <= .5) {
+            this.chat(e.user, e.text);
+          } else if (player[0].action == 'sending' && !text.match(/^send/)) {
+            this.chat(e.user, e.text);
+          } else if (player[0].action == 'killing' && !text.match(/^kill/)) {
+            this.chat(e.user, e.text);
+          }
+        } else {
+          this.chat(e.user, e.text);
+        }
+      });
+
     let players = this.players = this.playerOrder(this.players);
     let assigns = this.getRoleAssigns(Avalon.getAssigns(players.length, this.specialRoles, this.resistance));
     this.leader = players[0];
@@ -145,6 +173,14 @@ class Avalon {
     return this.gameEnded;
   }
 
+  chat(speaker, message) {
+    let user = this.playerDms[speaker];
+    let format = user.spectator || M.formatAtUser(this.players.filter(player => player.id == speaker)[0]);
+    for (let id of Object.keys(this.playerDms)) {
+      this.playerDms[id].send(`${format}: ${message}`);
+    }
+  }
+
   getRoleAssigns(roles) {
     return _.shuffle(roles);
   }
@@ -168,6 +204,7 @@ class Avalon {
     this.gameEnded.onCompleted();
     this.isRunning = false;
     this.subscription.dispose();
+    setTimeout(() => this.chatSubscription.dispose(), 60000);
   }
 
   playRound() {
@@ -180,7 +217,7 @@ class Avalon {
       return;
     }
     if (!this.spectators.some(s => s.id == spectator.id)) {
-      spectator.spectator = true;
+      spectator.spectator = M.formatAtUser(spectator);
       this.playerDms[spectator.id] = playerDm;
       let message = `Current quest progress: ${this.getStatus(true)}`;
       let order = this.players.map(p => p.id == this.leader.id ? `*${M.formatAtUser(p)}*` : M.formatAtUser(p))
@@ -278,10 +315,14 @@ class Avalon {
 
         this.dm(player,`${status}*You* choose${message} (.eg \`send name1, name2\`)`, '#a60', special);
         this.dmOtherPlayers(player,`${status}${M.formatAtUser(player)} chooses${message}`, null, special);
+        player.action = 'sending';
 
         return this.choosePlayersForQuest(player)
           .concatMap(votes => {
             let printQuesters = M.pp(this.questPlayers);
+            for (let player of this.players) {
+              player.action = null;
+            }
             if (votes.approved.length > votes.rejected.length) {
               this.broadcast(`The ${ORDER[this.questNumber]} quest with ${printQuesters} going was approved by ${M.pp(votes.approved)} (${votes.rejected.length ? M.pp(votes.rejected) : 'no one'} rejected)`)
               this.rejectCount = 0;
@@ -347,12 +388,15 @@ class Avalon {
         let message = `${M.formatAtUser(player)} is sending ${M.pp(questPlayers)} to the ${ORDER[this.questNumber]} quest.`;
         this.dm(this.players.filter(p => p.id != player.id), `${message}\nVote *approve* or *reject*`, '#555');
         this.dm(this.spectators, `${message}\nAwaiting votes...`);
+        for (let player of this.players) {
+          player.action = 'voting';
+        }
         return rx.Observable.fromArray(this.players)
           .map(p => this.dmMessages(p)
-            .where(e => e.user === p.id)
-            .map(e => e.text)
-            .where(text => text && text.match(/^\b(approve|reject)\b$/i))
-            .map(text => { return { player: p, approve: text.match(/approve/i) }})
+            .where(e => e.user === p.id && e.text)
+            .map(e => e.text.trim().toLowerCase())
+            .where(text => text.score('approve', .5) > .5 || text.score('reject', .5) > .5)
+            .map(text => { return { player: p, approve: text.score('approve', .5) > .5 }})
             .take(1))
           .mergeAll()
       })
@@ -399,16 +443,19 @@ class Avalon {
     let order = this.players.map(p => p.id == leader.id ? `*${M.formatAtUser(p)}*` : M.formatAtUser(p))
     message += `\nPlayer order: ${order}`;
     this.leader = leader;
-    this.dm(questPlayers, `${message}\nYou can *succeed* or *fail* for this mission`, '#ea0');
+    this.dm(questPlayers, `${message}\nYou can *succeed* or *fail* for this mission. Chat is disabled in the meantime.`, '#ea0');
     this.dmOtherPlayers(questPlayers, `${message}\nWait for the quest results.`);
+    for (let player of questPlayers) {
+      player.action = 'questing';
+    }
 
     let runners = 0;
     return rx.Observable.fromArray(questPlayers)
       .map(player => this.dmMessages(player)
-        .where(e => e.user === player.id)
-        .map(e => e.text)
-        .where(text => text && text.match(/^\b(succeed|fail)\b$/i))
-        .map(text => { return { player: player, fail: text.match(/fail/i) }})
+        .where(e => e.user === player.id && e.text)
+        .map(e => e.text.trim().toLowerCase())
+        .where(text => text.score('succeed', .5) > .5 || text.score('fail', .5) > .5)
+        .map(text => { return { player: player, fail: text.score('fail', .5) > .5 }})
         .take(1))
       .mergeAll()
       .take(questPlayers.length)
@@ -427,6 +474,9 @@ class Avalon {
         return acc;
       }, { succeeded: [], failed: [] })
       .map(questResults => {
+        for (let player of questPlayers) {
+          player.action = null;
+        }
         if (questResults.failed.length > 0) {
           this.progress.push('bad');
           this.broadcast(`${questResults.failed.length} in (${M.pp(questPlayers)}) failed the ${ORDER[this.questNumber]} quest!`, '#e00');
@@ -452,10 +502,12 @@ class Avalon {
           }
           let assassin = this.assassin;
           merlin = merlin[0];
-          
-          this.broadcast(`Victory is near for :large_blue_circle: Loyal Servents of Arthur for succeeding 3 quests!`);
+    
+          let status = `Quest Results: ${this.getStatus()}\n`;
+          this.broadcast(`${status}Victory is near for :large_blue_circle: Loyal Servents of Arthur for succeeding 3 quests!`);
           return rx.Observable.defer(() => {
             return rx.Observable.timer(1000, this.scheduler).flatMap(() => {
+              assassin.action = 'killing';
               this.dm(assassin, `*You* are the :red_circle::crossed_swords:ASSASSIN. Type \`kill <player>\` to attempt to kill MERLIN`, '#e00');
               this.dmOtherPlayers(assassin, `*${M.formatAtUser(assassin)}* is the :red_circle::crossed_swords:ASSASSIN. Awaiting the MERLIN assassination attempt...`);
 
@@ -476,7 +528,6 @@ class Avalon {
                   .where(accused => !!accused)
                   .take(1)
                   .do(accused => {
-                    let status = `Quest Results: ${this.getStatus()}\n`;
                     if (accused.role != 'merlin') {
                       this.dm(assassin, `${status}${M.formatAtUser(accused)} is not MERLIN. :angel:${M.formatAtUser(merlin)} is.\n:large_blue_circle: Loyal Servants of Arthur win!\n${this.revealRoles(true)}`, '#08e', 'end');
                       this.dmOtherPlayers(assassin, `${status}:crossed_swords:${M.formatAtUser(assassin)} chose ${M.formatAtUser(accused)} as MERLIN, not :angel:${M.formatAtUser(merlin)}.\n:large_blue_circle: Loyal Servants of Arthur win!\n${this.revealRoles(true)}`, '#08e', 'end');
