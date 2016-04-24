@@ -477,11 +477,17 @@ class Avalon {
         for (let player of questPlayers) {
           player.action = null;
         }
+        let questAssign = this.questAssign();
         if (questResults.failed.length > 0) {
-          this.progress.push('bad');
-          this.broadcast(`${questResults.failed.length} in (${M.pp(questPlayers)}) failed the ${ORDER[this.questNumber]} quest!`, '#e00');
+          if (questResults.failed.length < questAssign.f) {
+            this.progress.push('good');
+            this.broadcast(`${M.pp(questPlayers)} succeeded the ${ORDER[this.questNumber]} quest with ${questResults.failed.length} fail!`, '#08e');
+          } else {
+            this.progress.push('bad');
+            this.broadcast(`${questResults.failed.length} in (${M.pp(questPlayers)}) failed the ${ORDER[this.questNumber]} quest!`, '#e00');
+          }
         } else {
-          this.progress.push('good')
+          this.progress.push('good');
           this.broadcast(`${M.pp(questPlayers)} succeeded the ${ORDER[this.questNumber]} quest!`, '#08e');
         }
         this.questNumber++;
