@@ -204,7 +204,7 @@ class Avalon {
     this.gameEnded.onCompleted();
     this.isRunning = false;
     this.subscription.dispose();
-    setTimeout(() => this.chatSubscription.dispose(), 60000);
+    this.endTimeout = setTimeout(() => this.chatSubscription.dispose(), 60000);
   }
 
   playRound() {
@@ -527,6 +527,9 @@ class Avalon {
                     let accused = this.players.filter(player => player.name.toLowerCase() == match[1].trim().toLowerCase());
                     if (!accused.length) {
                       this.dm(assassin, `${match[1]} is not a valid player`);
+                      return null;
+                    } else if (accused[0].id == assassin.id) {
+                      this.dm(assassin, 'You cannot kill yourself');
                       return null;
                     }
                     return accused[0];

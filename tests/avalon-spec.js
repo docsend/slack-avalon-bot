@@ -5,7 +5,7 @@ const assert = require('chai').assert;
 const Avalon = require('../src/avalon');
 
 describe('Avalon', function() {
-  var game, slack, messages, scheduler, players, playerDms;
+  var game, slack, messages, scheduler, players, playerDms, lastMessage;
 
   beforeEach(function() {
     slack = { token: 0xDEADBEEF };
@@ -30,7 +30,14 @@ describe('Avalon', function() {
 
     game = new Avalon(slack, messages, players, scheduler);
     var logFunc = (method, id) => {
-      return (msg => console.log(`${method}(${id}): ${msg.replace(/\n+/g,'\n')}`));
+      return (msg) => {
+        if (method == 'postMessage') {
+          lastMessage = msg.attachments[0].text;
+        } else {
+          lastMessage = msg.replace(/\n+/g,'\n');
+        }
+        console.log(`${method}(${id}): ${lastMessage}`);
+      };
     };
     playerDms = {
       1: { send: logFunc('send',1), postMessage: logFunc('postMessage', 1) },
@@ -43,11 +50,353 @@ describe('Avalon', function() {
       8: { send: logFunc('send',8), postMessage: logFunc('postMessage', 8) }
     };
   });
-  
-  it('check standard game', function() {
-    game.start(playerDms, 0);
 
-    scheduler.advanceBy(1000);
-    messages.onNext({user: 1, text: 'send player_1, player_2, player_3'});
+  afterEach(function() {
+    clearTimeout(game.endTimeout);
+  });
+
+  function untilLastQuest() {
+    game.start(playerDms, 0);
+    scheduler.advanceBy(5000);
+
+    assert(lastMessage.match(/MERLIN/));
+    assert(lastMessage.match(/PERCIVAL/));
+    assert(lastMessage.match(/MORGANA/));
+
+    messages.onNext({user: game.players[0].id, text: 'send player_1, player_2, player_3'});
+    scheduler.advanceBy(5000);
+
+    assert(lastMessage.match(/to the first quest/));
+    assert(lastMessage.match(/player_1/));
+    assert(lastMessage.match(/player_2/));
+    assert(lastMessage.match(/player_3/));
+
+    messages.onNext({user: 1, text: 'approve'});
+    messages.onNext({user: 2, text: 'approve'});
+    messages.onNext({user: 3, text: 'approve'});
+    messages.onNext({user: 4, text: 'reject'});
+    messages.onNext({user: 5, text: 'reject'});
+    messages.onNext({user: 6, text: 'reject'});
+    messages.onNext({user: 7, text: 'reject'});
+    messages.onNext({user: 8, text: 'approve'});
+
+    assert(lastMessage.match(/first quest/));
+    assert(lastMessage.match(/going was rejected/));
+    scheduler.advanceBy(5000);
+
+    messages.onNext({user: game.players[1].id, text: 'send player_1, player_2, player_3'});
+    scheduler.advanceBy(5000);
+
+    assert(lastMessage.match(/to the first quest/));
+    assert(lastMessage.match(/player_1/));
+    assert(lastMessage.match(/player_2/));
+    assert(lastMessage.match(/player_3/));
+
+    messages.onNext({user: 1, text: 'approve'});
+    messages.onNext({user: 2, text: 'approve'});
+    messages.onNext({user: 3, text: 'approve'});
+    messages.onNext({user: 4, text: 'reject'});
+    messages.onNext({user: 5, text: 'approve'});
+    messages.onNext({user: 6, text: 'reject'});
+    messages.onNext({user: 7, text: 'reject'});
+    messages.onNext({user: 8, text: 'approve'});
+
+    assert(lastMessage.match(/first quest/));
+    assert(lastMessage.match(/going was approved/));
+    scheduler.advanceBy(5000);
+
+    messages.onNext({user: 1, text: 'succeed'});
+    messages.onNext({user: 2, text: 'succeed'});
+    messages.onNext({user: 3, text: 'succeed'});
+
+    assert(lastMessage.match(/succeeded the first quest/));
+    scheduler.advanceBy(5000);
+
+    messages.onNext({user: game.players[2].id, text: 'send player_1, player_2, player_3, player_4'});
+    scheduler.advanceBy(5000);
+
+    assert(lastMessage.match(/to the second quest/));
+    assert(lastMessage.match(/player_1/));
+    assert(lastMessage.match(/player_2/));
+    assert(lastMessage.match(/player_3/));
+    assert(lastMessage.match(/player_4/));
+
+    messages.onNext({user: 1, text: 'approve'});
+    messages.onNext({user: 2, text: 'approve'});
+    messages.onNext({user: 3, text: 'approve'});
+    messages.onNext({user: 4, text: 'approve'});
+    messages.onNext({user: 5, text: 'reject'});
+    messages.onNext({user: 6, text: 'reject'});
+    messages.onNext({user: 7, text: 'reject'});
+    messages.onNext({user: 8, text: 'approve'});
+
+    assert(lastMessage.match(/second quest/));
+    assert(lastMessage.match(/going was approved/));
+    scheduler.advanceBy(5000);
+
+    messages.onNext({user: 1, text: 'succeed'});
+    messages.onNext({user: 2, text: 'succeed'});
+    messages.onNext({user: 3, text: 'succeed'});
+    messages.onNext({user: 4, text: 'fail'});
+
+    assert(lastMessage.match(/failed the second quest/));
+    scheduler.advanceBy(5000);
+
+    messages.onNext({user: game.players[3].id, text: 'send player_1, player_2, player_3, player_4'});
+    scheduler.advanceBy(5000);
+
+    assert(lastMessage.match(/to the third quest/));
+    assert(lastMessage.match(/player_1/));
+    assert(lastMessage.match(/player_2/));
+    assert(lastMessage.match(/player_3/));
+    assert(lastMessage.match(/player_4/));
+
+    messages.onNext({user: 1, text: 'approve'});
+    messages.onNext({user: 2, text: 'approve'});
+    messages.onNext({user: 3, text: 'approve'});
+    messages.onNext({user: 4, text: 'approve'});
+    messages.onNext({user: 5, text: 'reject'});
+    messages.onNext({user: 6, text: 'reject'});
+    messages.onNext({user: 7, text: 'reject'});
+    messages.onNext({user: 8, text: 'approve'});
+
+    assert(lastMessage.match(/third quest/));
+    assert(lastMessage.match(/going was approved/));
+    scheduler.advanceBy(5000);
+
+    messages.onNext({user: 1, text: 'succeed'});
+    messages.onNext({user: 2, text: 'succeed'});
+    messages.onNext({user: 3, text: 'succeed'});
+    messages.onNext({user: 4, text: 'fail'});
+
+    assert(lastMessage.match(/failed the third quest/));
+    scheduler.advanceBy(5000);
+
+    messages.onNext({user: game.players[4].id, text: 'send player_1, player_2, player_3, player_4, player_5'});
+    scheduler.advanceBy(5000);
+
+    assert(lastMessage.match(/to the fourth quest/));
+    assert(lastMessage.match(/player_1/));
+    assert(lastMessage.match(/player_2/));
+    assert(lastMessage.match(/player_3/));
+    assert(lastMessage.match(/player_4/));
+    assert(lastMessage.match(/player_5/));
+
+    messages.onNext({user: 1, text: 'approve'});
+    messages.onNext({user: 2, text: 'approve'});
+    messages.onNext({user: 3, text: 'approve'});
+    messages.onNext({user: 4, text: 'approve'});
+    messages.onNext({user: 5, text: 'reject'});
+    messages.onNext({user: 6, text: 'reject'});
+    messages.onNext({user: 7, text: 'reject'});
+    messages.onNext({user: 8, text: 'approve'});
+
+    assert(lastMessage.match(/fourth quest/));
+    assert(lastMessage.match(/going was approved/));
+    scheduler.advanceBy(5000);
+
+    messages.onNext({user: 1, text: 'succeed'});
+    messages.onNext({user: 2, text: 'succeed'});
+    messages.onNext({user: 3, text: 'succeed'});
+    messages.onNext({user: 4, text: 'fail'});
+    messages.onNext({user: 5, text: 'succeed'});
+
+    assert(lastMessage.match(/succeeded the fourth quest with 1 fail/));
+    scheduler.advanceBy(5000);
+
+    messages.onNext({user: game.players[5].id, text: 'send player_1, player_2, player_3, player_4, player_5'});
+    scheduler.advanceBy(5000);
+
+    assert(lastMessage.match(/to the last quest/));
+    assert(lastMessage.match(/player_1/));
+    assert(lastMessage.match(/player_2/));
+    assert(lastMessage.match(/player_3/));
+    assert(lastMessage.match(/player_4/));
+    assert(lastMessage.match(/player_5/));
+
+    messages.onNext({user: 1, text: 'approve'});
+    messages.onNext({user: 2, text: 'approve'});
+    messages.onNext({user: 3, text: 'approve'});
+    messages.onNext({user: 4, text: 'approve'});
+    messages.onNext({user: 5, text: 'reject'});
+    messages.onNext({user: 6, text: 'reject'});
+    messages.onNext({user: 7, text: 'reject'});
+    messages.onNext({user: 8, text: 'approve'});
+
+    assert(lastMessage.match(/last quest/));
+    assert(lastMessage.match(/going was approved/));
+    scheduler.advanceBy(5000);
+  }
+  
+  it('good win', function() {
+    untilLastQuest();
+    messages.onNext({user: 1, text: 'succeed'});
+    messages.onNext({user: 2, text: 'succeed'});
+    messages.onNext({user: 3, text: 'succeed'});
+    messages.onNext({user: 4, text: 'succeed'});
+    messages.onNext({user: 5, text: 'succeed'});
+
+    assert(lastMessage.match(/Victory is near/));
+    scheduler.advanceBy(5000);
+
+    var assassin = game.players.filter(player => player.role == 'assassin');
+    assert(assassin.length > 0);
+    assassin = assassin[0];
+    assert(lastMessage.match(assassin.name));
+
+    var merlin = game.players.filter(player => player.role == 'merlin');
+    assert(merlin.length > 0);
+    messages.onNext({user: assassin.id, text: 'kill '+assassin.name });
+    assert(lastMessage.match(/You cannot kill yourself/));
+
+    var goodPerson = game.players.filter(player => player.role == 'good')[0];
+    messages.onNext({user: assassin.id, text: 'kill '+goodPerson.name });
+    assert(lastMessage.match(/Loyal Servants of Arthur win!/));
+  });
+
+  it('assassin win', function() {
+    untilLastQuest();
+    messages.onNext({user: 1, text: 'succeed'});
+    messages.onNext({user: 2, text: 'succeed'});
+    messages.onNext({user: 3, text: 'succeed'});
+    messages.onNext({user: 4, text: 'succeed'});
+    messages.onNext({user: 5, text: 'succeed'});
+
+    assert(lastMessage.match(/Victory is near/));
+    scheduler.advanceBy(5000);
+
+    var assassin = game.players.filter(player => player.role == 'assassin');
+    assert(assassin.length > 0);
+    assassin = assassin[0];
+    assert(lastMessage.match(assassin.name));
+
+    var merlin = game.players.filter(player => player.role == 'merlin');
+    assert(merlin.length > 0);
+    merlin = merlin[0];
+    messages.onNext({user: assassin.id, text: 'kill '+merlin.name });
+    assert(lastMessage.match(/Minions of Mordred win!/));
+  });
+
+  it('evil win', function() {
+    untilLastQuest();
+    messages.onNext({user: 1, text: 'succeed'});
+    messages.onNext({user: 2, text: 'succeed'});
+    messages.onNext({user: 3, text: 'fail'});
+    messages.onNext({user: 4, text: 'succeed'});
+    messages.onNext({user: 5, text: 'fail'});
+
+    assert(lastMessage.match(/Minions of Mordred win by failing 3 quests!/));
+  });
+
+  it('rejection win', function() {
+    game.start(playerDms, 0);
+    scheduler.advanceBy(5000);
+
+    assert(lastMessage.match(/MERLIN/));
+    assert(lastMessage.match(/PERCIVAL/));
+    assert(lastMessage.match(/MORGANA/));
+
+    messages.onNext({user: game.players[0].id, text: 'send player_1, player_2, player_3'});
+    scheduler.advanceBy(5000);
+
+    assert(lastMessage.match(/to the first quest/));
+    assert(lastMessage.match(/player_1/));
+    assert(lastMessage.match(/player_2/));
+    assert(lastMessage.match(/player_3/));
+
+    messages.onNext({user: 1, text: 'approve'});
+    messages.onNext({user: 2, text: 'approve'});
+    messages.onNext({user: 3, text: 'approve'});
+    messages.onNext({user: 4, text: 'reject'});
+    messages.onNext({user: 5, text: 'reject'});
+    messages.onNext({user: 6, text: 'reject'});
+    messages.onNext({user: 7, text: 'reject'});
+    messages.onNext({user: 8, text: 'approve'});
+
+    assert(lastMessage.match(/first quest/));
+    assert(lastMessage.match(/going was rejected/));
+    scheduler.advanceBy(5000);
+
+    messages.onNext({user: game.players[1].id, text: 'send player_4, player_5, player_6'});
+    scheduler.advanceBy(5000);
+
+    assert(lastMessage.match(/to the first quest/));
+    assert(lastMessage.match(/player_4/));
+    assert(lastMessage.match(/player_5/));
+    assert(lastMessage.match(/player_6/));
+
+    messages.onNext({user: 1, text: 'reject'});
+    messages.onNext({user: 2, text: 'approve'});
+    messages.onNext({user: 3, text: 'approve'});
+    messages.onNext({user: 4, text: 'reject'});
+    messages.onNext({user: 5, text: 'approve'});
+    messages.onNext({user: 6, text: 'reject'});
+    messages.onNext({user: 7, text: 'reject'});
+    messages.onNext({user: 8, text: 'approve'});
+
+    assert(lastMessage.match(/first quest/));
+    assert(lastMessage.match(/going was rejected/));
+    scheduler.advanceBy(5000);
+
+    messages.onNext({user: game.players[2].id, text: 'send player_7, player_8, player_1'});
+    scheduler.advanceBy(5000);
+
+    assert(lastMessage.match(/to the first quest/));
+    assert(lastMessage.match(/player_7/));
+    assert(lastMessage.match(/player_8/));
+    assert(lastMessage.match(/player_1/));
+
+    messages.onNext({user: 1, text: 'reject'});
+    messages.onNext({user: 2, text: 'approve'});
+    messages.onNext({user: 3, text: 'approve'});
+    messages.onNext({user: 4, text: 'reject'});
+    messages.onNext({user: 5, text: 'approve'});
+    messages.onNext({user: 6, text: 'reject'});
+    messages.onNext({user: 7, text: 'reject'});
+    messages.onNext({user: 8, text: 'approve'});
+
+    assert(lastMessage.match(/first quest/));
+    assert(lastMessage.match(/going was rejected/));
+    scheduler.advanceBy(5000);
+
+    messages.onNext({user: game.players[3].id, text: 'send player_1, player_5, player_7'});
+    scheduler.advanceBy(5000);
+
+    assert(lastMessage.match(/to the first quest/));
+    assert(lastMessage.match(/player_1/));
+    assert(lastMessage.match(/player_5/));
+    assert(lastMessage.match(/player_7/));
+
+    messages.onNext({user: 1, text: 'reject'});
+    messages.onNext({user: 2, text: 'approve'});
+    messages.onNext({user: 3, text: 'approve'});
+    messages.onNext({user: 4, text: 'reject'});
+    messages.onNext({user: 5, text: 'approve'});
+    messages.onNext({user: 6, text: 'reject'});
+    messages.onNext({user: 7, text: 'reject'});
+    messages.onNext({user: 8, text: 'approve'});
+
+    assert(lastMessage.match(/first quest/));
+    assert(lastMessage.match(/going was rejected/));
+    scheduler.advanceBy(5000);
+
+    messages.onNext({user: game.players[4].id, text: 'send player_1, player_2, player_7'});
+    scheduler.advanceBy(5000);
+
+    assert(lastMessage.match(/to the first quest/));
+    assert(lastMessage.match(/player_1/));
+    assert(lastMessage.match(/player_2/));
+    assert(lastMessage.match(/player_7/));
+
+    messages.onNext({user: 1, text: 'reject'});
+    messages.onNext({user: 2, text: 'reject'});
+    messages.onNext({user: 3, text: 'reject'});
+    messages.onNext({user: 4, text: 'reject'});
+    messages.onNext({user: 5, text: 'reject'});
+    messages.onNext({user: 6, text: 'reject'});
+    messages.onNext({user: 7, text: 'reject'});
+    messages.onNext({user: 8, text: 'reject'});
+
+    assert(lastMessage.match(/Minions of Mordred win due to the first quest rejected 5 times/));
   });
 });
