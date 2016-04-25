@@ -16,13 +16,30 @@ bot.login();
 const express = require('express');
 const app = express();
 const _ = require('lodash');
+const bodyParser = require('body-parser');
 
 app.set('view engine', 'pug');
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
 app.get('/', function (req, res)  {
+  if (!bot.channels) {
+    res.render('error', { error: 'Avalon Bot is initializing. Reload in a bit...' });
+    return;
+  } else if (bot.channels.length == 0) {
+    res.render('error', { error: 'Avalon Bot is in no valid slack channel' });
+    return;
+  }
   let users = _.filter(bot.slack.users, user => !user.is_bot && user.presence == 'active' && user.name != 'slackbot');
-  res.render('index', { users: users });
+  res.render('index', { users: users }); 
+});
+
+app.post('/start', function (req, res) {
+  if (req.body.players) {
+    bot.gameConfig.specialRoles = req.body.roles || [];
+    bot.startGame(req.body.players).subscribe();  
+  }
 });
 
 app.listen(process.env.PORT || 5000);

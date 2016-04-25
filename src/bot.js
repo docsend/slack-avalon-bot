@@ -211,7 +211,7 @@ class Bot {
         this.isPolling = false;
         this.addBotPlayers(starter.players);
         
-        return this.startGame(messages, starter.channel, starter.players);
+        return this.startGame(starter.players, messages, starter.channel);
       })
       .subscribe();
   }
@@ -347,12 +347,18 @@ class Bot {
 
   // Private: Starts and manages a new Avalon game.
   //
+  // players - The players participating in the game
   // messages - An {Observable} representing messages posted to the channel
   // channel - The channel where the game will be played
-  // players - The players participating in the game
   //
   // Returns an {Observable} that signals completion of the game 
-  startGame(messages, channel, players) {
+  startGame(players, messages, channel) {
+    if (!channel) {
+      players = players.map(name => this.slack.getUserByName(name));
+      messages = rx.Observable.fromEvent(this.slack, 'message').where(e => e.type === 'message');
+      channel = this.channels[0];
+    }
+
     if (players.length < Avalon.MIN_PLAYERS) {
       channel.send(`Not enough players for a game. Avalon requires ${Avalon.MIN_PLAYERS}-${Avalon.MAX_PLAYERS} players.`);
       return rx.Observable.return(null);

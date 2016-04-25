@@ -51,7 +51,7 @@ class Avalon {
       resistance: false,
       lady: false,
       order: 'turn',
-      specialRoles: ['percival','morgana']
+      specialRoles: ['merlin','percival','morgana']
     };
   }
 
@@ -59,13 +59,16 @@ class Avalon {
     resistance = resistance || false;
     let assigns = ROLE_ASSIGNS[numPlayers - Avalon.MIN_PLAYERS].slice(0);
     if (!resistance) {
-      assigns[assigns.indexOf('good')] = 'merlin';
-      let specialEvils = specialRoles.filter(role => role != 'percival');
-      if (specialEvils.length < specialRoles.length) {
-        assigns[assigns.indexOf('good')] = 'percival';
-      }
-      let bad = 0;
-      assigns = assigns.map((role,i) => role == 'bad' && bad < specialEvils.length ? specialEvils[bad++] : role);
+      specialRoles.forEach(role => {
+        switch(role) {
+        case 'merlin':
+        case 'percival':
+          assigns[assigns.indexOf('good')] = role;
+          break;
+        default:
+          assigns[assigns.indexOf('bad')] = role;
+        }
+      });
       let badIndex = assigns.indexOf('bad');
       if (badIndex >= 0) {
         assigns[badIndex] = 'assassin';

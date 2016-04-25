@@ -41,7 +41,7 @@ html(lang='en')
               input.role#oberon(type='checkbox')
               | Oberon
       .btn-group.btn-group-justified
-        a.btn.btn-default.disabled#start(href='#', role='button') Start Game
+        a.btn.btn-default.disabled#start(href='#', role='button') Need at least 5 players to start game
     script(src='js/jquery-1.12.3.min.js')
     script(src='js/bootstrap.min.js')
     script.
@@ -53,9 +53,19 @@ html(lang='en')
         } else {
           delete players[name];
         }
+        var numPlayers = Object.keys(players).length;
+        if (numPlayers < 5 && numPlayers > 10) {
+          $('#start').removeClass('btn-success').addClass('disabled btn-default').html('5-10 players required to start game');
+        } else if (numPlayers < 7 && $('#morgana').is(':checked') && $('#mordred').is(':checked') && $('#oberon').is(':checked')) {
+          $('#start').removeClass('btn-success').addClass('disabled btn-default').html('7-10 players required for 3 evil roles');
+        } else {
+          $('#start').removeClass('disabled btn-default').addClass('btn-success').html('Start Game');
+        }
       });
+
       $('.role').change(function(e) {
         e.stopPropagation();
+        var numPlayers = Object.keys(players).length;
         if (this.checked) {
           switch(this.id) {
           case 'percival':
@@ -69,9 +79,11 @@ html(lang='en')
             $('#merlin').prop('checked', true).parent().removeClass('btn-default').addClass('btn-primary active');
           default:
             $(this).parent().removeClass('btn-default').addClass('btn-danger');
+            if (numPlayers >= 5 && numPlayers < 7 && $('#morgana').is(':checked') && $('#mordred').is(':checked') && $('#oberon').is(':checked')) {
+              $('#start').removeClass('btn-success').addClass('disabled btn-default').html('7+ players required for 3 evil roles');
+            }
             break;
           }
-
         } else {
           $(this).parent().removeClass('btn-danger btn-primary active').addClass('btn-default');
           switch(this.id) {
@@ -82,5 +94,24 @@ html(lang='en')
             $('#morgana').prop('checked', false).parent().removeClass('btn-danger active').addClass('btn-default');
             break;
           }
+          if (numPlayers >= 5 && numPlayers < 7 && (!$('#morgana').is(':checked') || !$('#mordred').is(':checked') || !$('#oberon').is(':checked'))) {
+            $('#start').removeClass('disabled btn-default').addClass('btn-success').html('Start Game');
+          }
         }
-      })
+      });
+
+      $('#start').click(function() {
+        var roles = ['merlin', 'percival', 'morgana', 'mordred', 'oberon'];
+        for (var i = 4; i>= 0; i--) {
+          if (!$('#'+roles[i]).is(':checked')) {
+            roles.splice(i,1)
+          }
+        }
+        $.post({
+          url: '/start',
+          data: {
+            players: Object.keys(players),
+            roles: roles
+          }
+        });
+      });

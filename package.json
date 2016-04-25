@@ -22,6 +22,7 @@
     "lodash": "^4.0.1",
     "string_score": "^v0.1",
     "express": "^4.x",
-    "pug": "2.0.0-alpha6"
+    "pug": "2.0.0-alpha6",
+    "body-parser": "1.15.0"
   }
 }
