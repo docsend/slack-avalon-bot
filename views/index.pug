@@ -41,7 +41,7 @@ html(lang='en')
               input.role#oberon(type='checkbox')
               | Oberon
       .btn-group.btn-group-justified
-        a.btn.btn-default.disabled#start(href='#', role='button') Need at least 5 players to start game
+        a.btn.btn-default.disabled#start(href='#', role='button') 5-10 players required to start game
     script(src='js/jquery-1.12.3.min.js')
     script(src='js/bootstrap.min.js')
     script.
@@ -54,7 +54,7 @@ html(lang='en')
           delete players[name];
         }
         var numPlayers = Object.keys(players).length;
-        if (numPlayers < 5 && numPlayers > 10) {
+        if (numPlayers < 5 || numPlayers > 10) {
           $('#start').removeClass('btn-success').addClass('disabled btn-default').html('5-10 players required to start game');
         } else if (numPlayers < 7 && $('#morgana').is(':checked') && $('#mordred').is(':checked') && $('#oberon').is(':checked')) {
           $('#start').removeClass('btn-success').addClass('disabled btn-default').html('7-10 players required for 3 evil roles');
