@@ -31,7 +31,7 @@ app.get('/', function (req, res)  {
     res.render('error', { error: 'Avalon Bot is in no valid slack channel' });
     return;
   }
-  let users = _.filter(bot.slack.users, user => !user.is_bot && user.presence == 'active' && user.name != 'slackbot');
+  let users = _.filter(bot.slack.users, user => !user.is_bot && user.name != 'slackbot');
   res.render('index', { users: users }); 
 });
 

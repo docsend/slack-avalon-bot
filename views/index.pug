@@ -22,7 +22,10 @@ html(lang='en')
               for user in users
                 label.btn.btn-default
                   input.user(type='checkbox')
-                  = user.name
+                  if user.presence == 'active'
+                    = user.name
+                  else
+                    em(style='color:#aaa')= user.name
         .col-xs-6
           .btn-group-vertical(data-toggle='buttons')
             label.btn.btn-primary.active
