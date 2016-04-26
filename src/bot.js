@@ -448,6 +448,19 @@ class Bot {
     if (this.dms.length > 0) {
       console.log(`Your open DM's: ${this.dms.map(dm => dm.name).join(', ')}`);
     }
+
+    this._loggedOn = true;
+  }
+
+  isLoggedOn() {
+    return this._loggedOn;
+  }
+
+  getPotentialPlayers() {
+    if (!this.isLoggedOn()) {
+      return [];
+    }
+    return _.filter(this.slack.users, user => !user.is_bot && user.name != 'slackbot' && !user.deleted);
   }
 }
 

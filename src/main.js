@@ -15,7 +15,6 @@ bot.login();
 
 const express = require('express');
 const app = express();
-const _ = require('lodash');
 const bodyParser = require('body-parser');
 
 app.set('view engine', 'pug');
@@ -24,14 +23,14 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
 app.get('/', function (req, res)  {
-  if (!bot.channels) {
+  if (!bot.isLoggedOn()) {
     res.render('error', { error: 'Avalon Bot is initializing. Reload in a bit...' });
     return;
   } else if (bot.channels.length == 0) {
     res.render('error', { error: 'Avalon Bot is in no valid slack channel' });
     return;
   }
-  let users = _.filter(bot.slack.users, user => !user.is_bot && user.name != 'slackbot');
+  let users = bot.getPotentialPlayers();
   res.render('index', { users: users }); 
 });
 
