@@ -36,8 +36,8 @@ app.get('/', function (req, res)  {
 });
 
 app.post('/start', function (req, res) {
-  if (req.body.players) {
-    bot.gameConfig.specialRoles = req.body.roles || [];
+  if (req.body.players instanceof Array) {
+    bot.gameConfig.specialRoles = req.body.roles instanceof Array ? req.body.roles : [];
     bot.startGame(req.body.players).subscribe();  
   }
 });

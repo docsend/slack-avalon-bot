@@ -122,6 +122,8 @@ class Avalon {
         } else {
           this.chat(e.user, e.text);
         }
+      }, err => {
+        console.error('Chat Error: %s', err);
       });
 
     let players = this.players = this.playerOrder(this.players);
