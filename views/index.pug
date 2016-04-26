@@ -50,7 +50,7 @@ html(lang='en')
     script.
       var players = {};
       $('.user').change(function() {
-        var name = $(this).parent().html().match(/>(.*)$/)[1];
+        var name = $(this).parent().html().match(/>([a-z0-9][a-z0-9._-]*)/)[1];
         if (this.checked) {
           players[name] = true;
         } else {
