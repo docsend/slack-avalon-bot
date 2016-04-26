@@ -20,10 +20,11 @@ class Bot {
 
   // Public: Brings this bot online and starts handling messages sent to it.
   login() {
-    rx.Observable.fromEvent(this.slack, 'open')
-      .subscribe(() => this.onClientOpened());
+    this.slack
+      .on('open', () => this.onClientOpened())
+      .on('error', err => console.trace('Error emitted:',err))
+      .login();
 
-    this.slack.login();
     this.respondToMessages();
   }
 
