@@ -186,7 +186,7 @@ class Bot {
   //
   // Returns a {Disposable} that will end this subscription
   handleDealGameMessages(messages) {
-    let trigger = messages.where(e => e.text && e.text.toLowerCase().match(/^play (avalon|resistance)/i));
+    let trigger = messages.where(e => e.text && e.text.toLowerCase().match(/^play (avalon|resistance)|dta/i));
     trigger.map(e => this.slack.dms[e.channel]).where(channel => !!channel).do(channel => {
       channel.send(`Message to a channel to play avalon/resistance.`);
     }).subscribe();
@@ -281,7 +281,7 @@ class Bot {
 
     // Look for messages containing the word 'yes' and map them to a unique
     // user ID, constrained to `maxPlayers` number of players.
-    let pollPlayers = messages.where(e => e.text && e.text.toLowerCase().match(/\byes\b/))
+    let pollPlayers = messages.where(e => e.text && e.text.toLowerCase().match(/\byes\b|dta/i))
       .map(e => e.user)
       .map(id => this.slack.getUserByID(id));
     timeExpired.connect();

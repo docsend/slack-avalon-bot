@@ -97,34 +97,34 @@ class Avalon {
     this.playerDms = playerDms;
     this.date = new Date();
 
-    this.chatSubscription = this.messages
-      .where(e => playerDms[e.user] && e.channel == playerDms[e.user].id || this.spectators[e.user] && e.channel == this.spectators[e.user].id)
-      .where(e => e.text)
-      .subscribe(e => {
-        if (this.isRunning) {
-          if (e.text.match(/^quit game/i)) {
-            return;
-          }
-        } else {
-          this.chat(e.user, e.text);
-          return;
-        }
-        let player = this.players.filter(player => player.id == e.user);
-        if (player.length && player[0].action) {
-          let text = e.text.trim().toLowerCase();
-          if (player[0].action == 'voting' && text.score('approve', .5) <= .5 &&  text.score('reject', .5) <= .5) {
-            this.chat(e.user, e.text);
-          } else if (player[0].action == 'sending' && !text.match(/^send/)) {
-            this.chat(e.user, e.text);
-          } else if (player[0].action == 'killing' && !text.match(/^kill/)) {
-            this.chat(e.user, e.text);
-          }
-        } else {
-          this.chat(e.user, e.text);
-        }
-      }, err => {
-        console.error('Chat Error: %s', err);
-      });
+    // this.chatSubscription = this.messages
+    //   .where(e => playerDms[e.user] && e.channel == playerDms[e.user].id || this.spectators[e.user] && e.channel == this.spectators[e.user].id)
+    //   .where(e => e.text)
+    //   .subscribe(e => {
+    //     if (this.isRunning) {
+    //       if (e.text.match(/^quit game/i)) {
+    //         return;
+    //       }
+    //     } else {
+    //       this.chat(e.user, e.text);
+    //       return;
+    //     }
+    //     let player = this.players.filter(player => player.id == e.user);
+    //     if (player.length && player[0].action) {
+    //       let text = e.text.trim().toLowerCase();
+    //       if (player[0].action == 'voting' && text.score('approve', .5) <= .5 &&  text.score('reject', .5) <= .5) {
+    //         this.chat(e.user, e.text);
+    //       } else if (player[0].action == 'sending' && !text.match(/^send/)) {
+    //         this.chat(e.user, e.text);
+    //       } else if (player[0].action == 'killing' && !text.match(/^kill/)) {
+    //         this.chat(e.user, e.text);
+    //       }
+    //     } else {
+    //       this.chat(e.user, e.text);
+    //     }
+    //   }, err => {
+    //     console.error('Chat Error: %s', err);
+    //   });
 
     let players = this.players = this.playerOrder(this.players);
     let assigns = this.getRoleAssigns(Avalon.getAssigns(players.length, this.specialRoles, this.resistance));
@@ -178,13 +178,13 @@ class Avalon {
     return this.gameEnded;
   }
 
-  chat(speaker, message) {
-    let user = this.playerDms[speaker];
-    let format = user.spectator || M.formatAtUser(this.players.filter(player => player.id == speaker)[0]);
-    for (let id of Object.keys(this.playerDms)) {
-      this.playerDms[id].send(`${format}: ${message}`);
-    }
-  }
+  // chat(speaker, message) {
+  //   let user = this.playerDms[speaker];
+  //   let format = user.spectator || M.formatAtUser(this.players.filter(player => player.id == speaker)[0]);
+  //   for (let id of Object.keys(this.playerDms)) {
+  //     this.playerDms[id].send(`${format}: ${message}`);
+  //   }
+  // }
 
   getRoleAssigns(roles) {
     return _.shuffle(roles);
