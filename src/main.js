@@ -9,20 +9,20 @@ try {
   return;
 }
 
-const Bot = require('./bot');
-const bot = new Bot(token);
-bot.login();
-
 const express = require('express');
 const app = express();
 const bodyParser = require('body-parser');
+
+const Bot = require('./bot');
+const bot = new Bot(token);
+bot.login();
 
 app.set('view engine', 'pug');
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-app.get('/', function (req, res)  {
+app.get('/', (req, res) => {
   if (!bot.isLoggedOn()) {
     res.render('error', { error: 'Avalon Bot is initializing. Reload in a bit...' });
     return;
@@ -34,11 +34,31 @@ app.get('/', function (req, res)  {
   res.render('index', { users: users }); 
 });
 
-app.post('/start', function (req, res) {
+app.post('/start', (req, res) => {
   if (req.body.players instanceof Array) {
     bot.gameConfig.specialRoles = req.body.roles instanceof Array ? req.body.roles : [];
-    bot.startGame(req.body.players).subscribe();  
+    bot.startGame(req.body.players).subscribe(res.end('success'), res.end('failure'));
   }
+});
+
+app.post('/approve', (req, res) => {
+  console.log(req.body);
+  res.end();
+});
+
+app.post('/reject', (req, res) => {
+  console.log(req.body);
+  res.end();
+});
+
+app.post('/succeed', (req, res) => {
+  console.log(req.body);
+  res.end();
+});
+
+app.post('/fail', (req, res) => {
+  console.log(req.body);
+  res.end();
 });
 
 app.listen(process.env.PORT || 5000);
