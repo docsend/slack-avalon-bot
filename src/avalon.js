@@ -77,10 +77,11 @@ class Avalon {
     return assigns;
   }
 
-  constructor(slack, messages, players, scheduler) {
+  constructor(slack, messages, channel, players, scheduler) {
     scheduler = scheduler || rx.Scheduler.timeout;
     this.slack = slack;
     this.messages = messages;
+    this.channel = channel;
     this.players = players;
     this.spectators = [];
     this.scheduler = scheduler;
@@ -96,35 +97,6 @@ class Avalon {
     this.progress = [];
     this.playerDms = playerDms;
     this.date = new Date();
-
-    // this.chatSubscription = this.messages
-    //   .where(e => playerDms[e.user] && e.channel == playerDms[e.user].id || this.spectators[e.user] && e.channel == this.spectators[e.user].id)
-    //   .where(e => e.text)
-    //   .subscribe(e => {
-    //     if (this.isRunning) {
-    //       if (e.text.match(/^quit game/i)) {
-    //         return;
-    //       }
-    //     } else {
-    //       this.chat(e.user, e.text);
-    //       return;
-    //     }
-    //     let player = this.players.filter(player => player.id == e.user);
-    //     if (player.length && player[0].action) {
-    //       let text = e.text.trim().toLowerCase();
-    //       if (player[0].action == 'voting' && text.score('approve', .5) <= .5 &&  text.score('reject', .5) <= .5) {
-    //         this.chat(e.user, e.text);
-    //       } else if (player[0].action == 'sending' && !text.match(/^send/)) {
-    //         this.chat(e.user, e.text);
-    //       } else if (player[0].action == 'killing' && !text.match(/^kill/)) {
-    //         this.chat(e.user, e.text);
-    //       }
-    //     } else {
-    //       this.chat(e.user, e.text);
-    //     }
-    //   }, err => {
-    //     console.error('Chat Error: %s', err);
-    //   });
 
     let players = this.players = this.playerOrder(this.players);
     let assigns = this.getRoleAssigns(Avalon.getAssigns(players.length, this.specialRoles, this.resistance));
@@ -178,14 +150,6 @@ class Avalon {
     return this.gameEnded;
   }
 
-  // chat(speaker, message) {
-  //   let user = this.playerDms[speaker];
-  //   let format = user.spectator || M.formatAtUser(this.players.filter(player => player.id == speaker)[0]);
-  //   for (let id of Object.keys(this.playerDms)) {
-  //     this.playerDms[id].send(`${format}: ${message}`);
-  //   }
-  // }
-
   getRoleAssigns(roles) {
     return _.shuffle(roles);
   }
@@ -217,20 +181,6 @@ class Avalon {
       .concatMap(player => this.deferredActionForPlayer(player));
   }
 
-  addSpectator(spectator, playerDm) {
-    if (!this.isRunning) {
-      return;
-    }
-    if (!this.spectators.some(s => s.id == spectator.id)) {
-      spectator.spectator = M.formatAtUser(spectator);
-      this.playerDms[spectator.id] = playerDm;
-      let message = `Current quest progress: ${this.getStatus(true)}`;
-      let order = this.players.map(p => p.id == this.leader.id ? `*${M.formatAtUser(p)}*` : M.formatAtUser(p))
-      this.dm(spectator, `${message}\nPlayer order: ${order}`, null, 'start');
-      this.spectators.push(spectator);
-    }
-  }
-
   revealRoles(excludeMerlin) {
     excludeMerlin = excludeMerlin || false;
     let lines = [`${M.pp(this.evils)} are :red_circle: Minions of Mordred.`];
@@ -259,14 +209,11 @@ class Avalon {
     this.quit();
   }
 
-  dm(player, message, color, special) {
-    if (player instanceof Array) {
-      return player.forEach(p => this.dm(p, message, color, special));
-    }
+  broadcast(message, color, special) {
     let attachment = { fallback: message, text: message, mrkdwn: true, mrkdwn_in: ['pretext','text'] };
     if (color) attachment.color = color;
     if (special == 'start') {
-      attachment.pretext = `*${player.spectator ? 'Spectating' : 'Start'} Avalon Game* (${this.date})`;
+      attachment.pretext = `*Start Avalon Game* (${this.date})`;
       let prependText = `${this.evils.length} out of ${this.players.length} players are evil.`;
       let specialRoles = this.players.filter(p => p.role != 'good' && p.role != 'bad' || p.role != 'assassin');
       if (specialRoles.length) {
@@ -288,7 +235,7 @@ class Avalon {
     } else if (special == 'end') {
       attachment.pretext = `*End Avalon Game* (${this.date})`;
     }
-    return this.playerDms[player.id].postMessage({
+    return this.channel.postMessage({
       username: 'avalon-bot',
       icon_emoji: ':crystal_ball:',
       attachments: [attachment]
@@ -318,8 +265,7 @@ class Avalon {
         status += `Player order: ${order}\n`;
         let special = this.questNumber == 0 && this.rejectCount == 0 ? 'start' : '';
 
-        this.dm(player,`${status}*You* choose${message} (.eg \`send name1, name2\`)`, '#a60', special);
-        this.dmOtherPlayers(player,`${status}${M.formatAtUser(player)} chooses${message}`, null, special);
+        this.broadcast(`${status}${M.formatAtUser(player)} chooses${message} (.eg \`send name1, name2\`)`, '#a60', special);
         player.action = 'sending';
 
         return this.choosePlayersForQuest(player)
@@ -346,22 +292,6 @@ class Avalon {
     });
   }
 
-  broadcast(message, color, special) {
-    this.dm(this.players, message, color, special);
-    this.dm(this.spectators, message, color, special);
-  }
-
-  dmOtherPlayers(excludePlayer, message, color, special) {
-    let players;
-    if (excludePlayer instanceof Array) {
-      players = _.differenceBy(this.players, excludePlayer, (player) => player.id);
-    } else {
-      players = this.players.filter(player => player.id != excludePlayer.id);
-    }
-    this.dm(players, message, color, special);
-    this.dm(this.spectators, message, color, special);
-  }
-
   choosePlayersForQuest(player) {
     let questAssign = this.questAssign();
     return this.messages
@@ -383,16 +313,14 @@ class Avalon {
       })
       .where(questPlayers => {
         if (questPlayers.length != questAssign.n) {
-          this.dm(player, `You need to send ${questAssign.n} players. (You only chosen ${questPlayers.length} valid players)`, '#a60');
+          this.broadcast(`You need to send ${questAssign.n} players. (You only chosen ${questPlayers.length} valid players)`, '#a60');
         }
         return questPlayers.length == questAssign.n;
       })
       .concatMap(questPlayers => {
         this.questPlayers = questPlayers;
-        this.dm(player, `You've chosen ${M.pp(questPlayers)} to go on the ${ORDER[this.questNumber]} quest.\nVote *approve* or *reject*`, '#555');
         let message = `${M.formatAtUser(player)} is sending ${M.pp(questPlayers)} to the ${ORDER[this.questNumber]} quest.`;
-        this.dm(this.players.filter(p => p.id != player.id), `${message}\nVote *approve* or *reject*`, '#555');
-        this.dm(this.spectators, `${message}\nAwaiting votes...`);
+        this.broadcast(`${message}\nVote \`/approve\` or \`/reject\``, '#555');
         for (let player of this.players) {
           player.action = 'voting';
         }
@@ -406,7 +334,7 @@ class Avalon {
           .mergeAll()
       })
       .take(this.players.length)
-      .reduce((acc, vote) => {
+      .reduce((acc, vote) => { // TODO: bufferWithTime on this
         if (vote.approve) {
           acc.approved.push(vote.player);
         } else {
@@ -414,9 +342,8 @@ class Avalon {
         }
         if (acc.approved.length + acc.rejected.length < this.players.length) {
           let voted = acc.approved.concat(acc.rejected);
-          let message = `${voted.length} out of ${this.players.length} voted for the ${ORDER[this.questNumber]} quest.`;
-          this.dm(voted, `${message} Your vote is in!`);
-          _.differenceBy(this.players, voted).forEach(player => this.dm(player, `${message} Awaiting your vote...`));
+          let remaining = this.players.length - voted.length;
+          this.broadcast(`${M.formatAtUser(vote.player)} voted! ${remaining} vote${remaining > 1 ? 's' : ''} left.`);
         }
         return acc;
       }, { approved: [], rejected: [] })
@@ -448,8 +375,7 @@ class Avalon {
     let order = this.players.map(p => p.id == leader.id ? `*${M.formatAtUser(p)}*` : M.formatAtUser(p))
     message += `\nPlayer order: ${order}`;
     this.leader = leader;
-    this.dm(questPlayers, `${message}\nYou can *succeed* or *fail* for this mission. Chat is disabled in the meantime.`, '#ea0');
-    this.dmOtherPlayers(questPlayers, `${message}\nWait for the quest results.`);
+    this.broadcast(`${message}\nYou can \`/succeed\` or \`/fail\` this mission.`, '#ea0');
     for (let player of questPlayers) {
       player.action = 'questing';
     }
@@ -472,9 +398,8 @@ class Avalon {
         }
         if (acc.failed.length + acc.succeeded.length < questPlayers.length) {
           let completed = acc.failed.concat(acc.succeeded);
-          let message = `${completed.length} out of ${questPlayers.length} players have completed the ${ORDER[this.questNumber]} quest.`;
-          this.dm(completed, `${completed.length} out of ${questPlayers.length} players (including you) have completed the ${ORDER[this.questNumber]} quest.`);
-          _.differenceBy(this.players, completed).forEach(player => this.dm(player, `${message} Awaiting your quest completion...`));
+          let remaining = this.players.length - completed.length;
+          this.broadcast(`${M.formatAtUser(questResult.player)} completed the quest! ${remaining} remaining...`);
         }
         return acc;
       }, { succeeded: [], failed: [] })
@@ -519,8 +444,7 @@ class Avalon {
           return rx.Observable.defer(() => {
             return rx.Observable.timer(1000, this.scheduler).flatMap(() => {
               assassin.action = 'killing';
-              this.dm(assassin, `*You* are the :red_circle::crossed_swords:ASSASSIN. Type \`kill <player>\` to attempt to kill MERLIN`, '#e00');
-              this.dmOtherPlayers(assassin, `*${M.formatAtUser(assassin)}* is the :red_circle::crossed_swords:ASSASSIN. Awaiting the MERLIN assassination attempt...`);
+              this.broadcast(`*${M.formatAtUser(assassin)}* is the :red_circle::crossed_swords:ASSASSIN. Type \`kill <player>\` to attempt to kill MERLIN`, '#e00');
 
               return rx.Observable.return(true).flatMap(() => {
                 return this.messages
@@ -531,10 +455,10 @@ class Avalon {
                   .map(match => {
                     let accused = this.players.filter(player => player.name.toLowerCase() == match[1].trim().toLowerCase());
                     if (!accused.length) {
-                      this.dm(assassin, `${match[1]} is not a valid player`);
+                      this.broadcst(`${match[1]} is not a valid player`);
                       return null;
                     } else if (accused[0].id == assassin.id) {
-                      this.dm(assassin, 'You cannot kill yourself');
+                      this.broadcast('You cannot kill yourself');
                       return null;
                     }
                     return accused[0];
@@ -543,11 +467,9 @@ class Avalon {
                   .take(1)
                   .do(accused => {
                     if (accused.role != 'merlin') {
-                      this.dm(assassin, `${status}${M.formatAtUser(accused)} is not MERLIN. :angel:${M.formatAtUser(merlin)} is.\n:large_blue_circle: Loyal Servants of Arthur win!\n${this.revealRoles(true)}`, '#08e', 'end');
-                      this.dmOtherPlayers(assassin, `${status}:crossed_swords:${M.formatAtUser(assassin)} chose ${M.formatAtUser(accused)} as MERLIN, not :angel:${M.formatAtUser(merlin)}.\n:large_blue_circle: Loyal Servants of Arthur win!\n${this.revealRoles(true)}`, '#08e', 'end');
+                      this.broadcast(`${status}:crossed_swords:${M.formatAtUser(assassin)} chose ${M.formatAtUser(accused)} as MERLIN, not :angel:${M.formatAtUser(merlin)}.\n:large_blue_circle: Loyal Servants of Arthur win!\n${this.revealRoles(true)}`, '#08e', 'end');
                     } else {
-                      this.dm(assassin, `${status}You chose :angel:${M.formatAtUser(accused)} correctly as MERLIN.\n:red_circle: Minions of Mordred win!\n${this.revealRoles(true)}`, '#e00', 'end');
-                      this.dmOtherPlayers(assassin, `${status}:crossed_swords:${M.formatAtUser(assassin)} chose :angel:${M.formatAtUser(accused)} correctly as MERLIN.\n:red_circle: Minions of Mordred win!\n${this.revealRoles(true)}`, '#e00', 'end');
+                      this.broadcast(`${status}:crossed_swords:${M.formatAtUser(assassin)} chose :angel:${M.formatAtUser(accused)} correctly as MERLIN.\n:red_circle: Minions of Mordred win!\n${this.revealRoles(true)}`, '#e00', 'end');
                     }
                     this.quit();
                   });

@@ -45,7 +45,7 @@ class Bot {
 
     let disp = new rx.CompositeDisposable();
         
-    disp.add(this.handleDealGameMessages(messages));
+    disp.add(this.handleStartGameMessages(messages));
  
     disp.add(this.handleAtMessages(atMentions,'help',(tokens, channel) => {
       let gameMode = this.gameConfig.resistance ? 'Resistance' : `Avalon with ${this.gameConfig.specialRoles.join(', ').toUpperCase()}`;
@@ -185,7 +185,7 @@ class Bot {
   // messages - An {Observable} representing messages posted to a channel
   //
   // Returns a {Disposable} that will end this subscription
-  handleDealGameMessages(messages) {
+  handleStartGameMessages(messages) {
     let trigger = messages.where(e => e.text && e.text.toLowerCase().match(/^play (avalon|resistance)|dta/i));
     trigger.map(e => this.slack.dms[e.channel]).where(channel => !!channel).do(channel => {
       channel.send(`Message to a channel to play avalon/resistance.`);
@@ -201,7 +201,7 @@ class Bot {
       .where(starter => {
         if (this.isPolling) {
           return false;
-        } else if (this.isGameRunning) {
+        } else if (this.game) {
           starter.channel.send('Another game is in progress, quit that first.');
           return false;
         }
@@ -365,10 +365,7 @@ class Bot {
       return rx.Observable.return(null);
     }
 
-    channel.send(`${players.length} players (${M.pp(players)}) started a game. Say \`spectate\` to watch.`);
-    this.isGameRunning = true;
-    
-    let game = this.game = new Avalon(this.slack, messages, players);
+    let game = this.game = new Avalon(this.slack, messages, channel, players);
     _.extend(game, this.gameConfig);
 
     // Listen for messages directed at the bot containing 'quit game.'
@@ -381,31 +378,11 @@ class Bot {
         game.endGame(`${M.formatAtUser(player)} has decided to quit the game.`);
       });
 
-    let spectator;
-    let spectateGame = messages
-      .where(e => e.channel == channel.id)
-      .where(e => e.text && e.text.match(/spectate/i))
-      .where(e => {
-        if (players.some(player => player.id == e.user)) {
-          channel.send('You are already in the game');
-          return false;
-        }
-        if (game.spectators.some(spectator => spectator.id == e.user)) {
-          channel.send('You are already spectating the game');
-          return false;
-        }
-        return true;
-      })
-      .flatMap(e => SlackApiRx.openDms(this.slack, [spectator = this.slack.getUserByID(e.user)]))
-      .subscribe(playerDms => game.addSpectator(spectator, playerDms[spectator.id]));
-    
     return SlackApiRx.openDms(this.slack, players)
       .flatMap(playerDms => rx.Observable.timer(2000)
         .flatMap(() => game.start(playerDms)))
       .do(() => {
         quitGameDisp.dispose();
-        spectateGame.dispose();
-        this.isGameRunning = false;
         this.game = null;
       });
   }

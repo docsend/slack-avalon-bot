@@ -5,7 +5,7 @@ const assert = require('chai').assert;
 const Avalon = require('../src/avalon');
 
 describe('Avalon', function() {
-  var game, slack, messages, scheduler, players, playerDms, lastMessage;
+  var game, slack, messages, scheduler, players, playerDms, channel, lastMessage;
 
   beforeEach(function() {
     slack = { token: 0xDEADBEEF };
@@ -28,7 +28,6 @@ describe('Avalon', function() {
       { id: 8, name: 'player_8' }
     ];
 
-    game = new Avalon(slack, messages, players, scheduler);
     var logFunc = (method, id) => {
       return (msg) => {
         if (method == 'postMessage') {
@@ -38,6 +37,11 @@ describe('Avalon', function() {
         }
         console.log(`${method}(${id}): ${lastMessage}`);
       };
+    };
+
+    channel = {
+        send: logFunc('send','channel'),
+        postMessage: logFunc('postMessage', 'channel')
     };
     playerDms = {
       1: { send: logFunc('send',1), postMessage: logFunc('postMessage', 1) },
@@ -49,6 +53,8 @@ describe('Avalon', function() {
       7: { send: logFunc('send',7), postMessage: logFunc('postMessage', 7) },
       8: { send: logFunc('send',8), postMessage: logFunc('postMessage', 8) }
     };
+
+    game = new Avalon(slack, messages, channel, players, scheduler);
   });
 
   afterEach(function() {
