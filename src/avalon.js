@@ -209,7 +209,7 @@ class Avalon {
     this.gameEnded.onCompleted();
     this.isRunning = false;
     this.subscription.dispose();
-    this.endTimeout = setTimeout(() => this.chatSubscription.dispose(), 60000);
+    // this.endTimeout = setTimeout(() => this.chatSubscription.dispose(), 60000);
   }
 
   playRound() {

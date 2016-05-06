@@ -42,22 +42,35 @@ app.post('/start', (req, res) => {
 });
 
 app.post('/approve', (req, res) => {
-  console.log(req.body);
+  let dm;
+  if (bot.game && req.body.user_id && (dm = bot.game.playerDms[req.body.user_id])) {
+    bot.slack.emit('message', { user: req.body.user_id, text: 'approve', type: 'message', channel: dm.id });
+  }
   res.end();
 });
 
 app.post('/reject', (req, res) => {
-  console.log(req.body);
+  let dm;
+  if (bot.game && req.body.user_id && (dm = bot.game.playerDms[req.body.user_id])) {
+    bot.slack.emit('message', { user: req.body.user_id, text: 'reject', type: 'message', channel: dm.id });
+  }
   res.end();
 });
 
 app.post('/succeed', (req, res) => {
-  console.log(req.body);
+  let dm;
+  if (bot.game && req.body.user_id && (dm = bot.game.playerDms[req.body.user_id])) {
+    console.log(req.body)
+    bot.slack.emit('message', { user: req.body.user_id, text: 'succeed', type: 'message', channel: dm.id });
+  }
   res.end();
 });
 
 app.post('/fail', (req, res) => {
-  console.log(req.body);
+  let dm;
+  if (bot.game && req.body.user_id && (dm = bot.game.playerDms[req.body.user_id])) {
+    bot.slack.emit('message', { user: req.body.user_id, text: 'fail', type: 'message', channel: dm.id });
+  }
   res.end();
 });
 

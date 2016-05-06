@@ -368,7 +368,7 @@ class Bot {
     channel.send(`${players.length} players (${M.pp(players)}) started a game. Say \`spectate\` to watch.`);
     this.isGameRunning = true;
     
-    let game = new Avalon(this.slack, messages, players);
+    let game = this.game = new Avalon(this.slack, messages, players);
     _.extend(game, this.gameConfig);
 
     // Listen for messages directed at the bot containing 'quit game.'
@@ -406,6 +406,7 @@ class Bot {
         quitGameDisp.dispose();
         spectateGame.dispose();
         this.isGameRunning = false;
+        this.game = null;
       });
   }
 
