@@ -398,7 +398,7 @@ class Avalon {
         }
         if (acc.failed.length + acc.succeeded.length < questPlayers.length) {
           let completed = acc.failed.concat(acc.succeeded);
-          let remaining = this.players.length - completed.length;
+          let remaining = questPlayers.length - completed.length;
           this.broadcast(`${M.formatAtUser(questResult.player)} completed the quest! ${remaining} remaining...`);
         }
         return acc;
@@ -455,7 +455,7 @@ class Avalon {
                   .map(match => {
                     let accused = this.players.filter(player => player.name.toLowerCase() == match[1].trim().toLowerCase());
                     if (!accused.length) {
-                      this.broadcst(`${match[1]} is not a valid player`);
+                      this.broadcast(`${match[1]} is not a valid player`);
                       return null;
                     } else if (accused[0].id == assassin.id) {
                       this.broadcast('You cannot kill yourself');
