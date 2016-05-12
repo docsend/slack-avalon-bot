@@ -60,7 +60,6 @@ app.post('/reject', (req, res) => {
 app.post('/succeed', (req, res) => {
   let dm;
   if (bot.game && req.body.user_id && (dm = bot.game.playerDms[req.body.user_id])) {
-    console.log(req.body)
     bot.slack.emit('message', { user: req.body.user_id, text: 'succeed', type: 'message', channel: dm.id });
   }
   res.end();
