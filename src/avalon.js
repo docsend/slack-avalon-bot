@@ -77,9 +77,10 @@ class Avalon {
     return assigns;
   }
 
-  constructor(slack, messages, channel, players, scheduler) {
+  constructor(slack, api, messages, channel, players, scheduler) {
     scheduler = scheduler || rx.Scheduler.timeout;
     this.slack = slack;
+    this.api = api;
     this.messages = messages;
     this.channel = channel;
     this.players = players;
@@ -138,7 +139,7 @@ class Avalon {
         message += `. ${M.pp(knownEvils)} are evil`;
       }
       message += ` \`\`\`${_.times(60,_.constant('\n')).join('')}Scroll up to see your role\`\`\``;
-      this.playerDms[player.id].send(message);
+      this.slack.sendMessage(message, this.playerDms[player.id].id);
     }
 
     this.subscription = rx.Observable.return(true)
@@ -235,9 +236,7 @@ class Avalon {
     } else if (special == 'end') {
       attachment.pretext = `*End Avalon Game* (${this.date})`;
     }
-    return this.channel.postMessage({
-      username: 'avalon-bot',
-      icon_emoji: ':crystal_ball:',
+    return this.api.chat.postMessage(this.channel.id, '', {
       attachments: [attachment]
     });
   }

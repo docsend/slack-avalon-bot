@@ -18,11 +18,11 @@
   },
   "dependencies": {
     "rx": "^4.0.7",
-    "slack-client": "^1.4.1",
+    "@slack/client": "^3",
     "lodash": "^4.0.1",
     "string_score": "^v0.1",
     "express": "^4.x",
-    "pug": "2.0.0-alpha6",
+    "pug": "2.0.0-alpha7",
     "body-parser": "1.15.0"
   }
 }

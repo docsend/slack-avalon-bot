@@ -1,5 +1,6 @@
 'use strict';
 const rx = require('rx');
+const Slack = require('@slack/client');
 
 module.exports = class SlackApiRx {
   // Public: Retrieves DM channels for all of the given users, opening any that
@@ -9,9 +10,9 @@ module.exports = class SlackApiRx {
   // users - The users to fetch DM channels for
   //
   // Returns an {Observable} that signals completion
-  static openDms(slackApi, users) {
+  static openDms(slack, api, users) {
     let ret = rx.Observable.fromArray(users)
-      .flatMap((user) => SlackApiRx.getOrOpenDm(slackApi, user))
+      .flatMap((user) => SlackApiRx.getOrOpenDm(slack, api, user))
       .reduce((acc, x) => {
         acc[x.id] = x.dm;
         return acc;
@@ -32,9 +33,9 @@ module.exports = class SlackApiRx {
   // Returns an {Observable} representing the opened channel. This will be an
   // object with two keys: `id` and `dm`. DM will be null if the API call
   // failed for some reason (e.g., an invalid user).
-  static getOrOpenDm(slackApi, user) {
+  static getOrOpenDm(slack, api, user) {
     console.log(`Getting DM channel for ${user.name}`);
-    let dm = slackApi.getDMByName(user.name);
+    let dm = slack.dataStore.getDMByName(user.name);
     
     // Bot players don't need DM channels; we only talk to humans
     if ((dm && dm.is_open) || user.isBot) {
@@ -43,9 +44,7 @@ module.exports = class SlackApiRx {
     
     console.log(`No open channel found for ${user.name}, opening one using ${user.id}`);
     
-    return SlackApiRx.openDm(slackApi, user)
-      .flatMap(() => SlackApiRx.waitForDmToOpen(slackApi, user))
-      .flatMap((dm) => rx.Observable.return({id: user.id, dm: dm}))
+    return SlackApiRx.openDm(slack, api, user)
       .catch(rx.Observable.return({id: user.id, dm: null}));
   }
   
@@ -53,36 +52,11 @@ module.exports = class SlackApiRx {
   //
   // Returns an {Observable} that signals completion, or an error if the API
   // call fails
-  static openDm(slackApi, user) {
-    let calledOpen = new rx.AsyncSubject();
-    
-    slackApi.openDM(user.id, (result) => {
-      if (result.ok) {
-        calledOpen.onNext(user.name);
-        calledOpen.onCompleted();
-      } else {
-        console.log(`Unable to open DM for ${user.name}: ${result.error}`);
-        calledOpen.onError(new Error(result.error));
-      }
-    })
-    
-    return calledOpen;
-  }
-
-  // Private: The `im.open` callback is still not late enough; we need to wait
-  // for the client's underlying list of DM's to be updated. When that occurs
-  // we can retrieve the DM.
-  //
-  // Returns a replayable {Observable} containing the opened DM channel
-  static waitForDmToOpen(slackApi, user) {
-    let ret = rx.Observable.fromEvent(slackApi, 'raw_message')
-      .where((m) => m.type === 'im_open' && m.user === user.id)
+  static openDm(slack, api, user) {
+    api.dm.open(user.id);
+    return rx.Observable.fromEvent(slack, Slack.RTM_EVENTS.IM_OPEN)
+      .where(e => e.user == user.id)
       .take(1)
-      .flatMap(() => rx.Observable.timer(100).map(() =>
-        slackApi.getDMByName(user.name)))
-      .publishLast();
-      
-    ret.connect();
-    return ret;
+      .map(e => { return { id: e.user, dm: slack.dataStore.getDMByName(user.name) } });
   }
 };

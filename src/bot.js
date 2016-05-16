@@ -2,7 +2,7 @@
 const rx = require('rx');
 const _ = require('lodash');
 
-const Slack = require('slack-client');
+const Slack = require('@slack/client');
 const SlackApiRx = require('./slack-api-rx');
 const M = require('./message-helpers');
 const Avalon = require('./avalon');
@@ -12,8 +12,14 @@ class Bot {
   //
   // token - An API token from the bot integration
   constructor(token) {
-    this.slack = new Slack(token, true, true);
-    
+    this.slack = new Slack.RtmClient(token, {
+      logLevel: process.env.LOG_LEVEL || 'error',
+      dataStore: new Slack.MemoryDataStore(),
+      autoReconnect: true,
+      autoMark: true
+    });
+    this.api = new Slack.WebClient(token);
+
     this.gameConfig = Avalon.DEFAULT_CONFIG;
     this.gameConfigParams = ['timeout', 'mode'];
   }
@@ -21,9 +27,13 @@ class Bot {
   // Public: Brings this bot online and starts handling messages sent to it.
   login() {
     this.slack
-      .on('open', () => this.onClientOpened())
-      .on('error', err => console.trace('Error emitted:',err))
-      .login();
+      .on(Slack.CLIENT_EVENTS.RTM.AUTHENTICATED, (auth) => {
+        this.selfname = auth.self.name;
+        console.log(`Welcome to Slack. You are ${auth.self.name} of ${auth.team.name}`);
+      })
+      .on(Slack.CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, () => this.onClientOpened())
+      .on(Slack.CLIENT_EVENTS.UNABLE_TO_RTM_START, err => console.trace('Error emitted:',err))
+      .start();
 
     this.respondToMessages();
   }
@@ -33,135 +43,17 @@ class Bot {
   //
   // Returns a {Disposable} that will end this subscription
   respondToMessages() {
-    let messages = rx.Observable.fromEvent(this.slack, 'message')
-      .where(e => e.type === 'message');
+    let messages = rx.Observable.fromEvent(this.slack, Slack.RTM_EVENTS.MESSAGE);
 
-    rx.Observable.fromEvent(this.slack, 'message').where(e => e.subtype === 'channel_join').subscribe(e => {
-      let channel = this.slack.getChannelGroupOrDMByID(e.channel);
-      channel.send(this.welcomeMessage());
+    rx.Observable.fromEvent(this.slack, Slack.RTM_EVENTS.CHANNEL_JOINED).subscribe(e => {
+      this.slack.sendMessage(e.channel, this.welcomeMessage());
     });
 
-    let atMentions = messages.where(e => e.text && e.text.toLowerCase().match(this.slack.self.name));
+    let atMentions = messages.where(e => e.text && e.text.toLowerCase().match(this.selfname));
 
     let disp = new rx.CompositeDisposable();
         
     disp.add(this.handleStartGameMessages(messages));
- 
-    disp.add(this.handleAtMessages(atMentions,'help',(tokens, channel) => {
-      let gameMode = this.gameConfig.resistance ? 'Resistance' : `Avalon with ${this.gameConfig.specialRoles.join(', ').toUpperCase()}`;
-      let lines = [
-        `*Game mode*:\t${gameMode}`,
-        ...(this.gameConfig.lady ? ['*Lady of the Lake* enabled'] : []),
-        `*${_.capitalize(this.gameConfig.order)}* order`,
-        '*Usage*:',
-        '\t`roles`:\tShow what roles for each amount of players are set to',
-        '\t`add <role>`:\tadd special roles (morgana, percival, mordred, oberon, lady [of the lake])',
-        '\t`remove <role>`:\tremove special roles',
-        '\t`set <turn|random> order`:\tSet turn or random order'
-      ];
-      channel.send(lines.join('\n'));
-    }));
-
-    disp.add(this.handleAtMessages(atMentions,'roles',(tokens, channel) => {
-      let messages = [];
-      for (let i = Avalon.MIN_PLAYERS; i <= Avalon.MAX_PLAYERS; i++) {
-        let assigns = Avalon.getAssigns(i, this.gameConfig.specialRoles)
-          .map(role => (role != 'bad' && role != 'good') ? role.toUpperCase() : role)
-        messages.push(`${i} players: ${assigns.join(', ')}`);
-      }
-      channel.send(messages.join('\n'))
-    }));
-
-    disp.add(this.handleAtMessages(atMentions,'add',(tokens, channel) => {
-      let specialRoles = tokens.map(role => role.toLowerCase().trim());
-      let valid = false;
-      let messages = [];
-      let index = 0;
-      if (specialRoles.indexOf('morgana') >= 0) {
-        messages.push(`Added MORGANA to roles (which includes PERCIVAL)`);
-        this.includeRole('morgana');
-        this.includeRole('percival');
-        valid = true;
-      } else if (specialRoles.indexOf('percival') >= 0) {
-        messages.push(`Added PERCIVAL to roles`);
-        this.includeRole('percival');
-        valid = true;
-      }
-      if (specialRoles.indexOf('mordred') >= 0) {
-        messages.push(`Added MORDRED to roles`);
-        this.includeRole('mordred');
-        valid = true;
-      }
-      if (specialRoles.indexOf('oberon') >= 0) {
-        messages.push(`Added OBERON to roles`);
-        this.includeRole('oberon');
-        valid = true;
-      }
-      if (specialRoles.indexOf('lady') >= 0) {
-        messages.push(`Added LADY OF THE LAKE`);
-        this.gameConfig.lady = true;
-        valid = true;
-      }
-      if (!valid) {
-        messages.push('Invalid input, only morgana, percival, mordred, oberon, and lady are recognized');
-      }
-      let printRoles = this.gameConfig.specialRoles.map(role => role.toUpperCase()).join(', ');
-      messages.push(`Special roles: ${printRoles}`);
-      channel.send(messages.join('\n'));
-    }));
-
-    disp.add(this.handleAtMessages(atMentions,'remove', (tokens,channel) => {
-      let specialRoles = tokens.map(role => role.toLowerCase().trim());
-      let valid = false;
-      let messages = [];
-      let index = 0;
-      if (specialRoles.indexOf('percival') >= 0) {
-        if (this.excludeRole('morgana')) {
-          messages.push(`Removed PERCIVAL from roles (also removed dependent role MORGANA)`);
-        } else {
-          messages.push(`Removed PERCIVAL from roles`);
-        }
-        this.excludeRole('percival');
-        valid = true;
-      } else if (specialRoles.indexOf('morgana') >= 0) {
-        this.excludeRole('morgana');
-        messages.push(`Removed MORGANA from roles`);
-        valid = true;
-      }
-      if (specialRoles.indexOf('mordred') >= 0) {
-        messages.push(`Removed MORDRED from roles`);
-        this.excludeRole('mordred');
-        valid = true;
-      }
-      if (specialRoles.indexOf('oberon') >= 0) {
-        messages.push(`Removed OBERON from roles`);
-        this.excludeRole('oberon');
-        valid = true;
-      }
-      if (specialRoles.indexOf('lady') >= 0) {
-        messages.push(`Removed LADY OF THE LAKE`);
-        this.gameConfig.lady = false;
-        valid = true;
-      }
-      if (!valid) {
-        messages.push('Invalid input, only morgana, percival, mordred, oberon, and lady are recognized');
-      }
-      let printRoles = this.gameConfig.specialRoles.map(role => role.toUpperCase()).join(', ');
-      messages.push(`Special roles: ${printRoles}`);
-      channel.send(messages.join('\n'));
-    }));
-
-    disp.add(this.handleAtMessages(atMentions,'set',(tokens, channel) => {
-      if (tokens.length >= 2 && tokens[1] == 'order') {
-        if (tokens[0] == 'random') {
-          this.gameConfig.order = 'random';
-          channel.send('Set random order for the leader');
-        } else {
-          this.gameConfig.order = 'turn';
-          channel.send('Set turn order for the leader');
-        }
-      }
-    }));
     return disp;
   }
 
@@ -186,15 +78,16 @@ class Bot {
   //
   // Returns a {Disposable} that will end this subscription
   handleStartGameMessages(messages) {
+    let store = this.slack.dataStore;
     let trigger = messages.where(e => e.text && e.text.toLowerCase().match(/^play (avalon|resistance)|dta/i));
-    trigger.map(e => this.slack.dms[e.channel]).where(channel => !!channel).do(channel => {
-      channel.send(`Message to a channel to play avalon/resistance.`);
+    trigger.map(e => store.dms[e.channel]).where(channel => !!channel).do(channel => {
+      this.slack.sendMessage('Message to a channel to play avalon/resistance.', channel.id);
     }).subscribe();
 
     return trigger.map(e => {
       this.gameConfig.resistance = e.text.match(/resistance/i);
       return {
-        channel: this.slack.channels[e.channel] || this.slack.groups[e.channel],
+        channel: store.channels[e.channel] || store.groups[e.channel],
         initiator: e.user
       };
     }).where(starter => !!starter.channel)
@@ -202,7 +95,7 @@ class Bot {
         if (this.isPolling) {
           return false;
         } else if (this.game) {
-          starter.channel.send('Another game is in progress, quit that first.');
+          this.slack.sendMessage('Another game is in progress, quit that first.', channel.id);
           return false;
         }
         return true;
@@ -225,7 +118,7 @@ class Bot {
     return atMentions.where(e => e.user != this.slack.self.id)
       .where(e => e.text && e.text.toLowerCase().match(`[^\\s]+\\s+${command}`))
       .subscribe(e => {
-        let channel = this.slack.getChannelGroupOrDMByID(e.channel);
+        let channel = this.slack.dataStore.getChannelGroupOrDMByID(e.channel);
         let tokens = e.text.split(/[\s,]+/).slice(2);
         handler(tokens, channel);
       });
@@ -242,11 +135,16 @@ class Bot {
   //
   // Returns an {Observable} sequence that signals expiration of the message
   postMessageWithTimeout(channel, formatMessage, scheduler, timeout) {
-    let timeoutMessage = channel.send(formatMessage(timeout));
+    let sendMessage = rx.Observable.fromCallback(this.slack.sendMessage, this.slack);
 
-    let timeExpired = rx.Observable.timer(0, 1000, scheduler)
-      .take(timeout + 1)
-      .do((x) => timeoutMessage.updateMessage(formatMessage(`${timeout - x}`)))
+    let timeExpired = sendMessage(formatMessage(timeout), channel.id)
+      .flatMap(payload => {
+        return rx.Observable.timer(0, 1000, scheduler)
+          .take(timeout + 1)
+          .do((x) => {
+            this.api.chat.update(payload[1].ts, channel.id, formatMessage(`${timeout - x}`));
+          })
+      })
       .publishLast();
 
     return timeExpired;
@@ -265,9 +163,9 @@ class Bot {
     this.isPolling = true;
 
     if (this.gameConfig.resistance) {
-      channel.send('Who wants to play Resistance? https://amininima.files.wordpress.com/2013/05/theresistance.png');
+      this.slack.sendMessage('Who wants to play Resistance? https://amininima.files.wordpress.com/2013/05/theresistance.png', channel.id);
     } else {
-      channel.send('Who wants to play Avalon? https://cf.geekdo-images.com/images/pic1398895_md.jpg');
+      this.slack.sendMessage('Who wants to play Avalon? https://cf.geekdo-images.com/images/pic1398895_md.jpg', channel.id);
     }
 
     // let formatMessage = t => [
@@ -283,7 +181,7 @@ class Bot {
     // user ID, constrained to `maxPlayers` number of players.
     let pollPlayers = messages.where(e => e.text && e.text.toLowerCase().match(/\byes\b|dta/i))
       .map(e => e.user)
-      .map(id => this.slack.getUserByID(id));
+      .map(id => this.slack.dataStore.getUserByID(id));
     timeExpired.connect();
 
     let addPlayers = messages//.where(e => e.user == initiator)
@@ -292,7 +190,7 @@ class Bot {
       .flatMap(playerNames => {
         let errors = [];
         let players = playerNames.map(name => {
-          let player = this.slack.getUserByName(name.toLowerCase());
+          let player = this.slack.dataStore.getUserByName(name.toLowerCase());
           if (!player) {
             errors.push(`Cannot find player ${name}`);
           }
@@ -300,7 +198,7 @@ class Bot {
         }).filter(player => !!player);
         // players.add(this.slack.getUserById(id));
         if (errors.length) {
-          channel.send(errors.join('\n'));
+          this.slack.sendMessage(errors.join('\n'), channel.id);
         }
         return rx.Observable.fromArray(players);
       })
@@ -339,7 +237,7 @@ class Bot {
           } else if (players.length == Avalon.MAX_PLAYERS) {
             messages.push(`Maximum ${players.length} players ${M.pp(players)} are in game so far.`);
           }
-          channel.send(messages.join('\n'));
+          this.slack.sendMessage(messages.join('\n'), channel.id);
         }
         return players;
       }, [])
@@ -361,11 +259,11 @@ class Bot {
     }
 
     if (players.length < Avalon.MIN_PLAYERS) {
-      channel.send(`Not enough players for a game. Avalon requires ${Avalon.MIN_PLAYERS}-${Avalon.MAX_PLAYERS} players.`);
+      this.slack.sendMessage(`Not enough players for a game. Avalon requires ${Avalon.MIN_PLAYERS}-${Avalon.MAX_PLAYERS} players.`, channel.id);
       return rx.Observable.return(null);
     }
 
-    let game = this.game = new Avalon(this.slack, messages, channel, players);
+    let game = this.game = new Avalon(this.slack, this.api, messages, channel, players);
     _.extend(game, this.gameConfig);
 
     // Listen for messages directed at the bot containing 'quit game.'
@@ -374,11 +272,11 @@ class Bot {
       .subscribe(e => {
         // TODO: Should poll players to make sure they all want to quit.
         let player = this.slack.getUserByID(e.user);
-        channel.send(`${M.formatAtUser(player)} has decided to quit the game.`);
+        this.slack.sendMessage(`${M.formatAtUser(player)} has decided to quit the game.`, channel.id);
         game.endGame(`${M.formatAtUser(player)} has decided to quit the game.`);
       });
 
-    return SlackApiRx.openDms(this.slack, players)
+    return SlackApiRx.openDms(this.slack, this.api, players)
       .flatMap(playerDms => rx.Observable.timer(2000)
         .flatMap(() => game.start(playerDms)))
       .do(() => {
@@ -394,37 +292,36 @@ class Bot {
   }
 
   welcomeMessage() {
-    return `Hi! I can host Avalon games. Type \`play avalon\` to play or \`${this.slack.self.name} help\` for help.`
+    return `Hi! I can host Avalon games. Type \`play avalon\` to play.`
   }
 
   // Private: Save which channels and groups this bot is in and log them.
   onClientOpened() {
-    this.channels = _.keys(this.slack.channels)
-      .map(k => this.slack.channels[k])
+    let store = this.slack.dataStore;
+    let channels = _.keys(store.channels)
+      .map(k => store.channels[k])
       .filter(c => c.is_member);
 
-    this.groups = _.keys(this.slack.groups)
-      .map(k => this.slack.groups[k])
+    let groups = _.keys(store.groups)
+      .map(k => store.groups[k])
       .filter(g => g.is_open && !g.is_archived);
       
-    this.dms = _.keys(this.slack.dms)
-      .map(k => this.slack.dms[k])
+    let dms = _.keys(store.dms)
+      .map(k => store.dms[k])
       .filter(dm => dm.is_open);
 
-    console.log(`Welcome to Slack. You are ${this.slack.self.name} of ${this.slack.team.name}`);
-
-    if (this.channels.length > 0) {
-      console.log(`You are in: ${this.channels.map(c => c.name).join(', ')}`);
+    if (channels.length > 0) {
+      console.log(`You are in: ${channels.map(c => c.name).join(', ')}`);
     } else {
       console.log('You are not in any channels.');
     }
 
-    if (this.groups.length > 0) {
-      console.log(`As well as: ${this.groups.map(g => g.name).join(', ')}`);
+    if (groups.length > 0) {
+      console.log(`As well as: ${groups.map(g => g.name).join(', ')}`);
     }
     
-    if (this.dms.length > 0) {
-      console.log(`Your open DM's: ${this.dms.map(dm => dm.name).join(', ')}`);
+    if (dms.length > 0) {
+      console.log(`Your open DM's: ${dms.map(dm => store.getUserById(dm.user).name).join(', ')}`);
     }
 
     this._loggedOn = true;
