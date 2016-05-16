@@ -5,10 +5,25 @@ const assert = require('chai').assert;
 const Avalon = require('../src/avalon');
 
 describe('Avalon', function() {
-  var game, slack, messages, scheduler, players, playerDms, channel, lastMessage;
+  var game, slack, api, messages, scheduler, players, playerDms, channel, lastMessage;
 
   beforeEach(function() {
-    slack = { token: 0xDEADBEEF };
+    slack = {
+      token: 0xDEADBEEF,
+      sendMessage: function(message, id) {
+        lastMessage = message.replace(/\n+/g,'\n');
+        console.log(`sendMessage(${id}): ${lastMessage}`);
+      }
+    };
+    api = {
+      token: 0xDEADBEEF,
+      chat: {
+        postMessage: function(id, message, data) {
+          lastMessage = data.attachments[0].text;
+          console.log(`postMessage(${id}): ${lastMessage}`);
+        }  
+      }
+    }
     messages = new rx.Subject();
     messages.subscribe(m => {
       if (m.user && m.text) {
@@ -28,38 +43,30 @@ describe('Avalon', function() {
       { id: 8, name: 'player_8' }
     ];
 
-    var logFunc = (method, id) => {
-      return (msg) => {
-        if (method == 'postMessage') {
-          lastMessage = msg.attachments[0].text;
-        } else {
-          lastMessage = msg.replace(/\n+/g,'\n');
-        }
-        console.log(`${method}(${id}): ${lastMessage}`);
-      };
-    };
-
     channel = {
-        send: logFunc('send','channel'),
-        postMessage: logFunc('postMessage', 'channel')
+      id: 'channel'
     };
     playerDms = {
-      1: { send: logFunc('send',1), postMessage: logFunc('postMessage', 1) },
-      2: { send: logFunc('send',2), postMessage: logFunc('postMessage', 2) },
-      3: { send: logFunc('send',3), postMessage: logFunc('postMessage', 3) },
-      4: { send: logFunc('send',4), postMessage: logFunc('postMessage', 4) },
-      5: { send: logFunc('send',5), postMessage: logFunc('postMessage', 5) },
-      6: { send: logFunc('send',6), postMessage: logFunc('postMessage', 6) },
-      7: { send: logFunc('send',7), postMessage: logFunc('postMessage', 7) },
-      8: { send: logFunc('send',8), postMessage: logFunc('postMessage', 8) }
+      1: { id: 'dm1' },
+      2: { id: 'dm2' },
+      3: { id: 'dm3' },
+      4: { id: 'dm4' },
+      5: { id: 'dm5' },
+      6: { id: 'dm6' },
+      7: { id: 'dm7' },
+      8: { id: 'dm8' }
     };
 
-    game = new Avalon(slack, messages, channel, players, scheduler);
+    game = new Avalon(slack, api, messages, channel, players, scheduler);
   });
 
   afterEach(function() {
     clearTimeout(game.endTimeout);
   });
+
+  function dm(userId, text) {
+    messages.onNext({user: userId, channel: playerDms[userId].id, text: text});
+  }
 
   function untilLastQuest() {
     game.start(playerDms, 0);
@@ -77,14 +84,14 @@ describe('Avalon', function() {
     assert(lastMessage.match(/player_2/));
     assert(lastMessage.match(/player_3/));
 
-    messages.onNext({user: 1, text: 'approve'});
-    messages.onNext({user: 2, text: 'approve'});
-    messages.onNext({user: 3, text: 'approve'});
-    messages.onNext({user: 4, text: 'reject'});
-    messages.onNext({user: 5, text: 'reject'});
-    messages.onNext({user: 6, text: 'reject'});
-    messages.onNext({user: 7, text: 'reject'});
-    messages.onNext({user: 8, text: 'approve'});
+    dm(1, 'approve');
+    dm(2, 'approve');
+    dm(3, 'approve');
+    dm(4, 'reject');
+    dm(5, 'reject');
+    dm(6, 'reject');
+    dm(7, 'reject');
+    dm(8, 'approve');
 
     assert(lastMessage.match(/first quest/));
     assert(lastMessage.match(/going was rejected/));
@@ -98,22 +105,22 @@ describe('Avalon', function() {
     assert(lastMessage.match(/player_2/));
     assert(lastMessage.match(/player_3/));
 
-    messages.onNext({user: 1, text: 'approve'});
-    messages.onNext({user: 2, text: 'approve'});
-    messages.onNext({user: 3, text: 'approve'});
-    messages.onNext({user: 4, text: 'reject'});
-    messages.onNext({user: 5, text: 'approve'});
-    messages.onNext({user: 6, text: 'reject'});
-    messages.onNext({user: 7, text: 'reject'});
-    messages.onNext({user: 8, text: 'approve'});
+    dm(1, 'approve');
+    dm(2, 'approve');
+    dm(3, 'approve');
+    dm(4, 'reject');
+    dm(5, 'approve');
+    dm(6, 'reject');
+    dm(7, 'reject');
+    dm(8, 'approve');
 
     assert(lastMessage.match(/first quest/));
     assert(lastMessage.match(/going was approved/));
     scheduler.advanceBy(5000);
 
-    messages.onNext({user: 1, text: 'succeed'});
-    messages.onNext({user: 2, text: 'succeed'});
-    messages.onNext({user: 3, text: 'succeed'});
+    dm(1, 'succeed');
+    dm(2, 'succeed');
+    dm(3, 'succeed');
 
     assert(lastMessage.match(/succeeded the first quest/));
     scheduler.advanceBy(5000);
@@ -127,23 +134,23 @@ describe('Avalon', function() {
     assert(lastMessage.match(/player_3/));
     assert(lastMessage.match(/player_4/));
 
-    messages.onNext({user: 1, text: 'approve'});
-    messages.onNext({user: 2, text: 'approve'});
-    messages.onNext({user: 3, text: 'approve'});
-    messages.onNext({user: 4, text: 'approve'});
-    messages.onNext({user: 5, text: 'reject'});
-    messages.onNext({user: 6, text: 'reject'});
-    messages.onNext({user: 7, text: 'reject'});
-    messages.onNext({user: 8, text: 'approve'});
+    dm(1, 'approve');
+    dm(2, 'approve');
+    dm(3, 'approve');
+    dm(4, 'approve');
+    dm(5, 'reject');
+    dm(6, 'reject');
+    dm(7, 'reject');
+    dm(8, 'approve');
 
     assert(lastMessage.match(/second quest/));
     assert(lastMessage.match(/going was approved/));
     scheduler.advanceBy(5000);
 
-    messages.onNext({user: 1, text: 'succeed'});
-    messages.onNext({user: 2, text: 'succeed'});
-    messages.onNext({user: 3, text: 'succeed'});
-    messages.onNext({user: 4, text: 'fail'});
+    dm(1, 'succeed');
+    dm(2, 'succeed');
+    dm(3, 'succeed');
+    dm(4, 'fail');
 
     assert(lastMessage.match(/failed the second quest/));
     scheduler.advanceBy(5000);
@@ -157,23 +164,23 @@ describe('Avalon', function() {
     assert(lastMessage.match(/player_3/));
     assert(lastMessage.match(/player_4/));
 
-    messages.onNext({user: 1, text: 'approve'});
-    messages.onNext({user: 2, text: 'approve'});
-    messages.onNext({user: 3, text: 'approve'});
-    messages.onNext({user: 4, text: 'approve'});
-    messages.onNext({user: 5, text: 'reject'});
-    messages.onNext({user: 6, text: 'reject'});
-    messages.onNext({user: 7, text: 'reject'});
-    messages.onNext({user: 8, text: 'approve'});
+    dm(1, 'approve');
+    dm(2, 'approve');
+    dm(3, 'approve');
+    dm(4, 'approve');
+    dm(5, 'reject');
+    dm(6, 'reject');
+    dm(7, 'reject');
+    dm(8, 'approve');
 
     assert(lastMessage.match(/third quest/));
     assert(lastMessage.match(/going was approved/));
     scheduler.advanceBy(5000);
 
-    messages.onNext({user: 1, text: 'succeed'});
-    messages.onNext({user: 2, text: 'succeed'});
-    messages.onNext({user: 3, text: 'succeed'});
-    messages.onNext({user: 4, text: 'fail'});
+    dm(1, 'succeed');
+    dm(2, 'succeed');
+    dm(3, 'succeed');
+    dm(4, 'fail');
 
     assert(lastMessage.match(/failed the third quest/));
     scheduler.advanceBy(5000);
@@ -188,24 +195,24 @@ describe('Avalon', function() {
     assert(lastMessage.match(/player_4/));
     assert(lastMessage.match(/player_5/));
 
-    messages.onNext({user: 1, text: 'approve'});
-    messages.onNext({user: 2, text: 'approve'});
-    messages.onNext({user: 3, text: 'approve'});
-    messages.onNext({user: 4, text: 'approve'});
-    messages.onNext({user: 5, text: 'reject'});
-    messages.onNext({user: 6, text: 'reject'});
-    messages.onNext({user: 7, text: 'reject'});
-    messages.onNext({user: 8, text: 'approve'});
+    dm(1, 'approve');
+    dm(2, 'approve');
+    dm(3, 'approve');
+    dm(4, 'approve');
+    dm(5, 'reject');
+    dm(6, 'reject');
+    dm(7, 'reject');
+    dm(8, 'approve');
 
     assert(lastMessage.match(/fourth quest/));
     assert(lastMessage.match(/going was approved/));
     scheduler.advanceBy(5000);
 
-    messages.onNext({user: 1, text: 'succeed'});
-    messages.onNext({user: 2, text: 'succeed'});
-    messages.onNext({user: 3, text: 'succeed'});
-    messages.onNext({user: 4, text: 'fail'});
-    messages.onNext({user: 5, text: 'succeed'});
+    dm(1, 'succeed');
+    dm(2, 'succeed');
+    dm(3, 'succeed');
+    dm(4, 'fail');
+    dm(5, 'succeed');
 
     assert(lastMessage.match(/succeeded the fourth quest with 1 fail/));
     scheduler.advanceBy(5000);
@@ -220,14 +227,14 @@ describe('Avalon', function() {
     assert(lastMessage.match(/player_4/));
     assert(lastMessage.match(/player_5/));
 
-    messages.onNext({user: 1, text: 'approve'});
-    messages.onNext({user: 2, text: 'approve'});
-    messages.onNext({user: 3, text: 'approve'});
-    messages.onNext({user: 4, text: 'approve'});
-    messages.onNext({user: 5, text: 'reject'});
-    messages.onNext({user: 6, text: 'reject'});
-    messages.onNext({user: 7, text: 'reject'});
-    messages.onNext({user: 8, text: 'approve'});
+    dm(1, 'approve');
+    dm(2, 'approve');
+    dm(3, 'approve');
+    dm(4, 'approve');
+    dm(5, 'reject');
+    dm(6, 'reject');
+    dm(7, 'reject');
+    dm(8, 'approve');
 
     assert(lastMessage.match(/last quest/));
     assert(lastMessage.match(/going was approved/));
@@ -236,11 +243,11 @@ describe('Avalon', function() {
   
   it('good win', function() {
     untilLastQuest();
-    messages.onNext({user: 1, text: 'succeed'});
-    messages.onNext({user: 2, text: 'succeed'});
-    messages.onNext({user: 3, text: 'succeed'});
-    messages.onNext({user: 4, text: 'succeed'});
-    messages.onNext({user: 5, text: 'succeed'});
+    dm(1, 'succeed');
+    dm(2, 'succeed');
+    dm(3, 'succeed');
+    dm(4, 'succeed');
+    dm(5, 'succeed');
 
     assert(lastMessage.match(/Victory is near/));
     scheduler.advanceBy(5000);
@@ -262,11 +269,11 @@ describe('Avalon', function() {
 
   it('assassin win', function() {
     untilLastQuest();
-    messages.onNext({user: 1, text: 'succeed'});
-    messages.onNext({user: 2, text: 'succeed'});
-    messages.onNext({user: 3, text: 'succeed'});
-    messages.onNext({user: 4, text: 'succeed'});
-    messages.onNext({user: 5, text: 'succeed'});
+    dm(1, 'succeed');
+    dm(2, 'succeed');
+    dm(3, 'succeed');
+    dm(4, 'succeed');
+    dm(5, 'succeed');
 
     assert(lastMessage.match(/Victory is near/));
     scheduler.advanceBy(5000);
@@ -285,11 +292,11 @@ describe('Avalon', function() {
 
   it('evil win', function() {
     untilLastQuest();
-    messages.onNext({user: 1, text: 'succeed'});
-    messages.onNext({user: 2, text: 'succeed'});
-    messages.onNext({user: 3, text: 'fail'});
-    messages.onNext({user: 4, text: 'succeed'});
-    messages.onNext({user: 5, text: 'fail'});
+    dm(1, 'succeed');
+    dm(2, 'succeed');
+    dm(3, 'fail');
+    dm(4, 'succeed');
+    dm(5, 'fail');
 
     assert(lastMessage.match(/Minions of Mordred win by failing 3 quests!/));
   });
@@ -310,14 +317,14 @@ describe('Avalon', function() {
     assert(lastMessage.match(/player_2/));
     assert(lastMessage.match(/player_3/));
 
-    messages.onNext({user: 1, text: 'approve'});
-    messages.onNext({user: 2, text: 'approve'});
-    messages.onNext({user: 3, text: 'approve'});
-    messages.onNext({user: 4, text: 'reject'});
-    messages.onNext({user: 5, text: 'reject'});
-    messages.onNext({user: 6, text: 'reject'});
-    messages.onNext({user: 7, text: 'reject'});
-    messages.onNext({user: 8, text: 'approve'});
+    dm(1, 'approve');
+    dm(2, 'approve');
+    dm(3, 'approve');
+    dm(4, 'reject');
+    dm(5, 'reject');
+    dm(6, 'reject');
+    dm(7, 'reject');
+    dm(8, 'approve');
 
     assert(lastMessage.match(/first quest/));
     assert(lastMessage.match(/going was rejected/));
@@ -331,14 +338,14 @@ describe('Avalon', function() {
     assert(lastMessage.match(/player_5/));
     assert(lastMessage.match(/player_6/));
 
-    messages.onNext({user: 1, text: 'reject'});
-    messages.onNext({user: 2, text: 'approve'});
-    messages.onNext({user: 3, text: 'approve'});
-    messages.onNext({user: 4, text: 'reject'});
-    messages.onNext({user: 5, text: 'approve'});
-    messages.onNext({user: 6, text: 'reject'});
-    messages.onNext({user: 7, text: 'reject'});
-    messages.onNext({user: 8, text: 'approve'});
+    dm(1, 'reject');
+    dm(2, 'approve');
+    dm(3, 'approve');
+    dm(4, 'reject');
+    dm(5, 'approve');
+    dm(6, 'reject');
+    dm(7, 'reject');
+    dm(8, 'approve');
 
     assert(lastMessage.match(/first quest/));
     assert(lastMessage.match(/going was rejected/));
@@ -352,14 +359,14 @@ describe('Avalon', function() {
     assert(lastMessage.match(/player_8/));
     assert(lastMessage.match(/player_1/));
 
-    messages.onNext({user: 1, text: 'reject'});
-    messages.onNext({user: 2, text: 'approve'});
-    messages.onNext({user: 3, text: 'approve'});
-    messages.onNext({user: 4, text: 'reject'});
-    messages.onNext({user: 5, text: 'approve'});
-    messages.onNext({user: 6, text: 'reject'});
-    messages.onNext({user: 7, text: 'reject'});
-    messages.onNext({user: 8, text: 'approve'});
+    dm(1, 'reject');
+    dm(2, 'approve');
+    dm(3, 'approve');
+    dm(4, 'reject');
+    dm(5, 'approve');
+    dm(6, 'reject');
+    dm(7, 'reject');
+    dm(8, 'approve');
 
     assert(lastMessage.match(/first quest/));
     assert(lastMessage.match(/going was rejected/));
@@ -373,14 +380,14 @@ describe('Avalon', function() {
     assert(lastMessage.match(/player_5/));
     assert(lastMessage.match(/player_7/));
 
-    messages.onNext({user: 1, text: 'reject'});
-    messages.onNext({user: 2, text: 'approve'});
-    messages.onNext({user: 3, text: 'approve'});
-    messages.onNext({user: 4, text: 'reject'});
-    messages.onNext({user: 5, text: 'approve'});
-    messages.onNext({user: 6, text: 'reject'});
-    messages.onNext({user: 7, text: 'reject'});
-    messages.onNext({user: 8, text: 'approve'});
+    dm(1, 'reject');
+    dm(2, 'approve');
+    dm(3, 'approve');
+    dm(4, 'reject');
+    dm(5, 'approve');
+    dm(6, 'reject');
+    dm(7, 'reject');
+    dm(8, 'approve');
 
     assert(lastMessage.match(/first quest/));
     assert(lastMessage.match(/going was rejected/));
@@ -394,14 +401,14 @@ describe('Avalon', function() {
     assert(lastMessage.match(/player_2/));
     assert(lastMessage.match(/player_7/));
 
-    messages.onNext({user: 1, text: 'reject'});
-    messages.onNext({user: 2, text: 'reject'});
-    messages.onNext({user: 3, text: 'reject'});
-    messages.onNext({user: 4, text: 'reject'});
-    messages.onNext({user: 5, text: 'reject'});
-    messages.onNext({user: 6, text: 'reject'});
-    messages.onNext({user: 7, text: 'reject'});
-    messages.onNext({user: 8, text: 'reject'});
+    dm(1, 'reject');
+    dm(2, 'reject');
+    dm(3, 'reject');
+    dm(4, 'reject');
+    dm(5, 'reject');
+    dm(6, 'reject');
+    dm(7, 'reject');
+    dm(8, 'reject');
 
     assert(lastMessage.match(/Minions of Mordred win due to the first quest rejected 5 times/));
   });
