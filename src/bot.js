@@ -339,7 +339,7 @@ class Bot {
     if (!this.isLoggedOn()) {
       return [];
     }
-    return _.filter(this.slack.users, user => !user.is_bot && user.name != 'slackbot' && !user.deleted);
+    return _.filter(this.slack.dataStore.users, user => !user.is_bot && user.name != 'slackbot' && !user.deleted);
   }
 }
 
