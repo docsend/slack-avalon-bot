@@ -254,8 +254,8 @@ class Bot {
   startGame(players, messages, channel) {
     if (!channel) {
       players = players.map(name => this.slack.getUserByName(name));
-      messages = rx.Observable.fromEvent(this.slack, 'message').where(e => e.type === 'message');
-      channel = this.channels[0];
+      messages = rx.Observable.fromEvent(this.slack, Slack.RTM_EVENTS.MESSAGE);
+      channel = this.getChannels()[0];
     }
 
     if (players.length < Avalon.MIN_PLAYERS) {
@@ -293,6 +293,10 @@ class Bot {
 
   welcomeMessage() {
     return `Hi! I can host Avalon games. Type \`play avalon\` to play.`
+  }
+
+  getChannels() {
+    return this.slack.dataStore.channels;
   }
 
   // Private: Save which channels and groups this bot is in and log them.

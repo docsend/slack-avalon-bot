@@ -26,7 +26,7 @@ app.get('/', (req, res) => {
   if (!bot.isLoggedOn()) {
     res.render('error', { error: 'Avalon Bot is initializing. Reload in a bit...' });
     return;
-  } else if (bot.channels.length == 0) {
+  } else if (bot.getChannels().length == 0) {
     res.render('error', { error: 'Avalon Bot is in no valid slack channel' });
     return;
   }
