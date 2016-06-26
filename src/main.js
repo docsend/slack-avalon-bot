@@ -37,7 +37,12 @@ app.get('/', (req, res) => {
 app.post('/start', (req, res) => {
   if (req.body.players instanceof Array) {
     bot.gameConfig.specialRoles = req.body.roles instanceof Array ? req.body.roles : [];
-    bot.startGame(req.body.players).subscribe(res.end('success'), res.end('failure'));
+    let obs = bot.startGame(req.body.players);
+    if (obs) {
+      obs.subscribe(res.end('success'), res.end('failure'));
+    } else {
+      res.end('failure');
+    }
   }
 });
 

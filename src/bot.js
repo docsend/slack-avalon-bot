@@ -253,14 +253,15 @@ class Bot {
   // Returns an {Observable} that signals completion of the game 
   startGame(players, messages, channel) {
     if (!channel) {
-      players = players.map(name => this.slack.getUserByName(name));
+      players = players.map(name => this.slack.dataStore.getUserByName(name));
       messages = rx.Observable.fromEvent(this.slack, Slack.RTM_EVENTS.MESSAGE);
       channel = this.getChannels()[0];
     }
 
     if (players.length < Avalon.MIN_PLAYERS) {
+      // TODO: send status back to webpage
       this.slack.sendMessage(`Not enough players for a game. Avalon requires ${Avalon.MIN_PLAYERS}-${Avalon.MAX_PLAYERS} players.`, channel.id);
-      return rx.Observable.return(null);
+      return;
     }
 
     let game = this.game = new Avalon(this.slack, this.api, messages, channel, players);
@@ -296,7 +297,10 @@ class Bot {
   }
 
   getChannels() {
-    return this.slack.dataStore.channels;
+    let store = this.slack.dataStore;
+    return _.keys(store.channels)
+      .map(k => store.channels[k])
+      .filter(c => c.is_member);
   }
 
   // Private: Save which channels and groups this bot is in and log them.
