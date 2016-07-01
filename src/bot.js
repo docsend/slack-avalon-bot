@@ -298,9 +298,13 @@ class Bot {
 
   getChannels() {
     let store = this.slack.dataStore;
-    return _.keys(store.channels)
+    let channels = _.keys(store.channels)
       .map(k => store.channels[k])
       .filter(c => c.is_member);
+    let groups = _.keys(store.groups)
+      .map(k => store.groups[k])
+      .filter(g => g.is_open && !g.is_archived);
+    return channels.concat(groups);
   }
 
   // Private: Save which channels and groups this bot is in and log them.
