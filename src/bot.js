@@ -272,7 +272,7 @@ class Bot {
       .take(1)
       .subscribe(e => {
         // TODO: Should poll players to make sure they all want to quit.
-        let player = this.slack.getUserByID(e.user);
+        let player = this.slack.dataStore.getUserByID(e.user);
         this.slack.sendMessage(`${M.formatAtUser(player)} has decided to quit the game.`, channel.id);
         game.endGame(`${M.formatAtUser(player)} has decided to quit the game.`);
       });
