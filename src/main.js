@@ -31,18 +31,24 @@ app.get('/', (req, res) => {
     return;
   }
   let users = bot.getPotentialPlayers();
-  res.render('index', { users: users }); 
+  let channels = bot.getChannels();
+  res.render('index', { users: users, channels: channels });
 });
 
 app.post('/start', (req, res) => {
-  if (req.body.players instanceof Array) {
+  if (req.body.players instanceof Array && res.body.channel) {
+    if (bot.getChannels().filter(c => c.name == res.body.channel).length == 0) {
+      return res.end('failure');
+    }
     bot.gameConfig.specialRoles = req.body.roles instanceof Array ? req.body.roles : [];
-    let obs = bot.startGame(req.body.players);
+    let obs = bot.startGame(req.body.players, null, req.body.channel);
     if (obs) {
       obs.subscribe(res.end('success'), res.end('failure'));
     } else {
       res.end('failure');
     }
+  } else {
+    res.end('failure');
   }
 });
 

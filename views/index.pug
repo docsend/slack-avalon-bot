@@ -43,6 +43,17 @@ html(lang='en')
             label.btn.btn-default
               input.role#oberon(type='checkbox')
               | Oberon
+          br
+          br
+          .btn-group-vertical(data-toggle='buttons')
+            for channel in channels
+              label.btn.btn-default
+                input.channel(type='radio',name=channel._modelName, value=channel.name)
+                if channel._modelName == 'Channel'
+                  = '#' + channel.name
+                else
+                  span.glyphicon.glyphicon-lock
+                  = channel.name
       .btn-group.btn-group-justified
         a.btn.btn-default.disabled#start(href='#', role='button') 5-10 players required to start game
     script(src='js/jquery-1.12.3.min.js')
@@ -113,6 +124,7 @@ html(lang='en')
         $.post({
           url: '/start',
           data: {
+            channel: $('.channel:checked').val(),
             players: Object.keys(players),
             roles: roles
           }

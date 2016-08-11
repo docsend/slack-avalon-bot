@@ -52,7 +52,7 @@ class Bot {
     let atMentions = messages.where(e => e.text && e.text.toLowerCase().match(this.selfname));
 
     let disp = new rx.CompositeDisposable();
-        
+
     disp.add(this.handleStartGameMessages(messages));
     return disp;
   }
@@ -70,7 +70,7 @@ class Bot {
     }
     return false;
   }
-  
+
   // Private: Looks for messages directed at the bot that contain the word
   // "deal." When found, start polling players for a game.
   //
@@ -104,7 +104,7 @@ class Bot {
       .flatMap(starter => {
         this.isPolling = false;
         this.addBotPlayers(starter.players);
-        
+
         return this.startGame(starter.players, messages, starter.channel);
       })
       .subscribe();
@@ -149,14 +149,14 @@ class Bot {
 
     return timeExpired;
   }
-  
+
   // Private: Polls players to join the game, and if we have enough, starts an
   // instance.
   //
   // messages - An {Observable} representing messages posted to the channel
   // channel - The channel where the deal message was posted
   //
-  // Returns an {Observable} that signals completion of the game 
+  // Returns an {Observable} that signals completion of the game
   pollPlayersForGame(messages, channel, initiator, specialChars, scheduler, timeout) {
     scheduler = scheduler || rx.Scheduler.timeout;
     timeout = timeout || 60;
@@ -231,7 +231,7 @@ class Bot {
           }
 
           players.splice.apply(players,[0,0].concat(newPlayers));
-          
+
           if (players.length > 1 && players.length < Avalon.MAX_PLAYERS) {
             messages.push(`${players.length} players ${M.pp(players)} are in game so far.`);
           } else if (players.length == Avalon.MAX_PLAYERS) {
@@ -250,12 +250,12 @@ class Bot {
   // messages - An {Observable} representing messages posted to the channel
   // channel - The channel where the game will be played
   //
-  // Returns an {Observable} that signals completion of the game 
+  // Returns an {Observable} that signals completion of the game
   startGame(players, messages, channel) {
-    if (!channel) {
+    if (!messages) {
       players = players.map(name => this.slack.dataStore.getUserByName(name));
       messages = rx.Observable.fromEvent(this.slack, Slack.RTM_EVENTS.MESSAGE);
-      channel = this.getChannels()[0];
+      channel = this.getChannels().filter(c => c.name == channel)[0];
     }
 
     if (players.length < Avalon.MIN_PLAYERS) {
@@ -317,7 +317,7 @@ class Bot {
     let groups = _.keys(store.groups)
       .map(k => store.groups[k])
       .filter(g => g.is_open && !g.is_archived);
-      
+
     let dms = _.keys(store.dms)
       .map(k => store.dms[k])
       .filter(dm => dm.is_open);
@@ -331,7 +331,7 @@ class Bot {
     if (groups.length > 0) {
       console.log(`As well as: ${groups.map(g => g.name).join(', ')}`);
     }
-    
+
     if (dms.length > 0) {
       console.log(`Your open DM's: ${dms.map(dm => store.getUserById(dm.user).name).join(', ')}`);
     }
