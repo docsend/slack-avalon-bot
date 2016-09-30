@@ -118,7 +118,7 @@ class Bot {
     return atMentions.where(e => e.user != this.slack.self.id)
       .where(e => e.text && e.text.toLowerCase().match(`[^\\s]+\\s+${command}`))
       .subscribe(e => {
-        let channel = this.slack.dataStore.getChannelGroupOrDMByID(e.channel);
+        let channel = this.slack.dataStore.getChannelGroupOrDMById(e.channel);
         let tokens = e.text.split(/[\s,]+/).slice(2);
         handler(tokens, channel);
       });
@@ -272,7 +272,7 @@ class Bot {
       .take(1)
       .subscribe(e => {
         // TODO: Should poll players to make sure they all want to quit.
-        let player = this.slack.dataStore.getUserByID(e.user);
+        let player = this.slack.dataStore.getUserById(e.user);
         this.slack.sendMessage(`${M.formatAtUser(player)} has decided to quit the game.`, channel.id);
         game.endGame(`${M.formatAtUser(player)} has decided to quit the game.`);
       });
