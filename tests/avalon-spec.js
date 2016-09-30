@@ -21,7 +21,7 @@ describe('Avalon', function() {
         postMessage: function(id, message, data) {
           lastMessage = data.attachments[0].text;
           console.log(`postMessage(${id}): ${lastMessage}`);
-        }  
+        }
       }
     }
     messages = new rx.Subject();
@@ -30,7 +30,7 @@ describe('Avalon', function() {
         console.log(`${players.find(p => p.id == m.user).name}: ${m.text}`);
       }
     });
-    
+
     scheduler = new rx.HistoricalScheduler();
     players = [
       { id: 1, name: 'player_1' },
@@ -240,7 +240,7 @@ describe('Avalon', function() {
     assert(lastMessage.match(/going was approved/));
     scheduler.advanceBy(5000);
   }
-  
+
   it('good win', function() {
     untilLastQuest();
     dm(1, 'succeed');

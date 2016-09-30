@@ -147,7 +147,7 @@ class Avalon {
       .repeat()
       .takeUntil(this.gameEnded)
       .subscribe();
-      
+
     return this.gameEnded;
   }
 
@@ -437,7 +437,7 @@ class Avalon {
           }
           let assassin = this.assassin;
           merlin = merlin[0];
-    
+
           let status = `Quest Results: ${this.getStatus()}\n`;
           this.broadcast(`${status}Victory is near for :large_blue_circle: Loyal Servents of Arthur for succeeding 3 quests!`);
           return rx.Observable.defer(() => {

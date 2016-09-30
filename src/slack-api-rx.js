@@ -18,11 +18,11 @@ module.exports = class SlackApiRx {
         return acc;
       }, {})
       .publishLast();
-      
+
     ret.connect();
     return ret;
   }
-  
+
   // Private: Checks for the existence of an open DM channel for the user,
   // opens one if necessary, then waits for the `im_open` event and retrieves
   // the DM channel.
@@ -36,18 +36,18 @@ module.exports = class SlackApiRx {
   static getOrOpenDm(slack, api, user) {
     console.log(`Getting DM channel for ${user.name}`);
     let dm = slack.dataStore.getDMByName(user.name);
-    
+
     // Bot players don't need DM channels; we only talk to humans
     if ((dm && dm.is_open) || user.isBot) {
       return rx.Observable.return({id: user.id, dm: dm});
     }
-    
+
     console.log(`No open channel found for ${user.name}, opening one using ${user.id}`);
-    
+
     return SlackApiRx.openDm(slack, api, user)
       .catch(rx.Observable.return({id: user.id, dm: null}));
   }
-  
+
   // Private: Maps the `im.open` API call into an {Observable}.
   //
   // Returns an {Observable} that signals completion, or an error if the API
