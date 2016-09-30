@@ -3,7 +3,7 @@
   "version": "0.9.0",
   "engines": {
     "node": "latest"
-  }, 
+  },
   "repository": "https://github.com/docsend/slack-avalon-bot",
   "scripts": {
     "start": "node src/main.js",
@@ -24,5 +24,10 @@
     "express": "^4.x",
     "pug": "2.0.0-alpha7",
     "body-parser": "1.15.0"
+  },
+  "eslintConfig": {
+    "env": {
+      "es6": true
+    }
   }
 }

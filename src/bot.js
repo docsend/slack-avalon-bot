@@ -181,7 +181,7 @@ class Bot {
     // user ID, constrained to `maxPlayers` number of players.
     let pollPlayers = messages.where(e => e.text && e.text.toLowerCase().match(/\byes\b|dta/i))
       .map(e => e.user)
-      .map(id => this.slack.dataStore.getUserByID(id));
+      .map(id => this.slack.dataStore.getUserById(id));
     timeExpired.connect();
 
     let addPlayers = messages//.where(e => e.user == initiator)
