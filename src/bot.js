@@ -261,7 +261,7 @@ class Bot {
     if (players.length < Avalon.MIN_PLAYERS) {
       // TODO: send status back to webpage
       this.slack.sendMessage(`Not enough players for a game. Avalon requires ${Avalon.MIN_PLAYERS}-${Avalon.MAX_PLAYERS} players.`, channel.id);
-      return;
+      return rx.Observable.empty();
     }
 
     let game = this.game = new Avalon(this.slack, this.api, messages, channel, players);
